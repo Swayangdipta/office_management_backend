@@ -10,10 +10,15 @@ const PORT = process.env.PORT || 8080
 const authRoutes = require('./routes/auth')
 const hrmRoutes = require('./routes/hrm')
 
+const corsOptions = {
+    origin: 'https://offmgmt.netlify.app',
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization']
+};
 // Middlewares
 app.use(cookieParser())
 app.use(express.json())
-app.use(cors())
+app.use(cors(corsOptions))
 
 // Routes
 app.use('/api',authRoutes)
