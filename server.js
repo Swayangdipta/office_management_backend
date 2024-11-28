@@ -9,11 +9,12 @@ const PORT = process.env.PORT || 8080
 // Route imports
 const authRoutes = require('./routes/auth')
 const hrmRoutes = require('./routes/hrm')
+const adminRoutes = require('./routes/admin')
 
 const corsOptions = {
-    origin: 'https://offmgmt.netlify.app',
+    origin: ['https://offmgmt.netlify.app', 'http://localhost:5173'],
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization']
+    allowedHeaders: ['Content-Type', 'Authorization', 'Accept']
 };
 // Middlewares
 app.use(cookieParser())
@@ -23,6 +24,7 @@ app.use(cors(corsOptions))
 // Routes
 app.use('/api',authRoutes)
 app.use('/api',hrmRoutes)
+app.use('/api',adminRoutes)
 
 // Connecting to Dtabase and Starting the Server
 dbConnection(app, PORT)

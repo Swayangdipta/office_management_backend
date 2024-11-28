@@ -242,9 +242,9 @@ exports.generatePay = async (req, res) => {
 
 exports.getPayByEmployee = async (req, res) => {
   try {
-    const { emp_id } = req.params;
+    const { _id } = req.body;
 
-    if (!emp_id) {
+    if (!_id) {
       return res.status(400).json({
         error: "Employee ID is required",
         message: "Bad Request",
@@ -252,7 +252,7 @@ exports.getPayByEmployee = async (req, res) => {
     }
 
     // Fetch pay details for the given employee
-    const payDetails = await PayGeneration.find({ emp_id })
+    const payDetails = await PayGeneration.find({ employee: _id })
       .populate("employee")
       .exec();
 

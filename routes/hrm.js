@@ -2,27 +2,34 @@ const express = require('express');
 const router = express.Router();
 const hrmController = require('../controllers/hrm');  // Your HRM Controller // Your handlers
 const { isSignedIn, hasHRMRights } = require('../controllers/auth');  // Any auth middleware if applicable
-const { getEndUserById } = require('../controllers/admin');  // Any auth middleware if applicable
+const { getEndUserById, pushIntoDesignation, getDesignations, getDesignationById } = require('../controllers/admin');  // Any auth middleware if applicable
 
 // Params
 router.param("empId",hrmController.getEmployeeById)
 router.param("euId",getEndUserById)
+router.param("degnId",getDesignationById)
 
 // Employee Routes
 // router.get('/hrm/employee/:empId', isSignedIn, hasHRMRights, hrmController.getEmployeeById, hrmController.getEmployee);  // Get employee by empId
 router.post('/hrm/employees/:euId', isSignedIn, hasHRMRights, hrmController.getEmployees);  // Create new employee
-router.post('/hrm/employee/:empId', isSignedIn, hasHRMRights, hrmController.createEmployee);  // Create new employee
+router.post('/hrm/employee/:euId/:degnId', isSignedIn, hasHRMRights, hrmController.createEmployee,pushIntoDesignation);  // Create new employee
 router.put('/hrm/employee/:empId', isSignedIn, hasHRMRights, hrmController.updateEmployee);  // Update employee by empId
-router.delete('/hrm/employee/:empId', isSignedIn, hasHRMRights, hrmController.deleteEmployee);  // Delete employee by empId
+router.delete('/hrm/employee/:empId', isSignedIn, hasHRMRights, hrmController.deleteEmployee);
+// router.post('/hrm/roles/:hrmId',isSignedIn,hasHRMRights,hrmController.get)  // Delete employee by empId
+
+// Designations
+router.post('/hrm/designations/:euId', isSignedIn, hasHRMRights, getDesignations)
 
 // Pay Bill Routes
 // router.get('/hrm/paybill/:payBillId', isSignedIn, getPayBillById, hrmController.getPayBill);  // Get pay bill by payBillId
-router.post('/hrm/paybill/:empId', isSignedIn,hasHRMRights, hrmController.postPayBill);  // Create new pay bill
+router.post('/hrm/paybill/gen/:euId', isSignedIn,hasHRMRights, hrmController.generatePay);  // Create new pay bill
+router.post('/hrm/paybill/:euId', isSignedIn,hasHRMRights, hrmController.getPayByEmployee);  // Create new pay bill
+router.post('/hrm/paybill/:euId', isSignedIn,hasHRMRights, hrmController.postPayBill);  // Create new pay bill
 // router.put('/hrm/paybill/:payBillId', isSignedIn, getPayBillById, hrmController.updatePayBill);  // Update pay bill by payBillId
 // router.delete('/hrm/paybill/:payBillId', isSignedIn, getPayBillById, hrmController.deletePayBill);  // Delete pay bill by payBillId
 
 // Pay Slip Routes
-router.get('/hrm/payslip/:empId', isSignedIn,hasHRMRights, hrmController.getPaySlip);  // Get pay slip by paySlipId
+router.get('/hrm/payslip/:empId/:euId', isSignedIn,hasHRMRights, hrmController.getPaySlip);  // Get pay slip by paySlipId
 // router.post('/hrm/payslip', isSignedIn, hrmController.generatePaySlip);  // Generate new pay slip
 
 // Remittance Routes

@@ -32,6 +32,20 @@ exports.getEndUserById = async (req,res,next,id) => {
     }
 }
 
+exports.getDesignationById = async (req,res,next,id) => {
+    try {
+        const designation = await Designations.findById(id)
+        if(!designation || designation.errors){
+            return res.status(404).json({error: 'Account not found!', message: designation})
+        }
+        req.designation = designation
+        next()
+    } catch (error) {
+
+        return res.status(500).json({error: 'Internal Server Error!', message: error})
+    }
+}
+
 exports.createDesignation = async (req,res) => {
     try {
         if(!req.body.title){
@@ -45,6 +59,18 @@ exports.createDesignation = async (req,res) => {
         }
 
         return res.status(200).json({success: 'Designation created successfully!', message: designation })
+    } catch (error) {
+        return res.status(500).json({error: 'Internal Server Error!', message: error})
+    }
+}
+
+exports.getDesignations = async (req,res) => {
+    try {
+        const designations = await Designations.find()
+        if(!designations || designations.errors ){
+            return res.status(404).json({error: 'No designations found!'})
+        }
+        return res.status(200).json({success: 'Designations found successfully!', message: designations})
     } catch (error) {
         return res.status(500).json({error: 'Internal Server Error!', message: error})
     }
@@ -93,11 +119,8 @@ exports.pushIntoDesignation = async (req,res) => {
     try {
         const designation = req.designation
 
-        if(!req.body.emp_id){
-            return res.status(400).json({error: 'Employee is required!'})
-        }
 
-        const updatedDesignation = await designation.updateOne({$push: {employees: req.body.emp_id}})
+        const updatedDesignation = await designation.updateOne({$push: {employees: req.savedEmployee._id}})
 
         if(!updatedDesignation || updatedDesignation.errors ){
             return res.status(400).json({error: 'Failed to push employee into designation!', message: updatedDesignation})
@@ -113,11 +136,7 @@ exports.popFromDesignation = async (req,res) => {
     try {
         const designation = req.designation
 
-        if(!req.body.emp_id){
-            return res.status(400).json({error: 'Employee is required!'})
-        }
-
-        const updatedDesignation = await designation.updateOne({$pull: {employees: req.body.emp_id}})
+        const updatedDesignation = await designation.updateOne({$pull: {employees: req.savedEmployee._id}})
 
         if(!updatedDesignation || updatedDesignation.errors ){
             return res.status(400).json({error: 'Failed to pop employee from designation!', message: updatedDesignation})
