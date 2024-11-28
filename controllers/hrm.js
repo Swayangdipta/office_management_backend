@@ -277,9 +277,9 @@ exports.getPayByEmployee = async (req, res) => {
 // Pay Bill Posting
 exports.postPayBill = async (req, res) => {
   try {
-    const { emp_id, pay_date } = req.body;
+    const { _id, pay_date } = req.body;
 
-    if (!emp_id || !pay_date) {
+    if (!_id || !pay_date) {
       return res.status(400).json({
         error: "Employee ID and Pay Date are required",
         message: "Bad Request",
@@ -288,7 +288,7 @@ exports.postPayBill = async (req, res) => {
 
     // Fetch the generated pay details for the given employee and pay date
     const payGeneration = await PayGeneration.findOne({
-      emp_id,
+      employee: _id,
       pay_date,
     });
 
@@ -309,6 +309,7 @@ exports.postPayBill = async (req, res) => {
       gross_pay: payGeneration.gross_pay,
       net_pay: payGeneration.net_pay,
       pay_date: payGeneration.pay_date,
+      status: 'Posted'
     });
 
     // Save the Pay Bill record
@@ -423,17 +424,21 @@ exports.postRemittance = async (req, res) => {
 
 exports.getPaySlip = async (req, res) => {
   try {
-    const { emp_id, month, year } = req.body;
-
-    if (!emp_id || !month || !year) {
+    const { _id, pay_date } = req.body;
+    const months = ["January", "February","March","April","May","June","July","August","September","October","November","December"]
+    if (!_id || !pay_date) {
       return res.status(400).json({
         error: "Bad Request",
         message: "Employee ID, month, and year are required.",
       });
     }
 
+    const month = months[parseInt(pay_date.split("-")[1]) - 1];
+    const year = pay_date.split("-")[0]
+
+    
     // Find employee
-    const employee = await Employee.findOne({ emp_id });
+    const employee = await Employee.findOne({ _id });
     if (!employee) {
       return res.status(404).json({ error: "Employee not found!" });
     }
@@ -441,8 +446,7 @@ exports.getPaySlip = async (req, res) => {
     // Fetch pay bill
     const payBill = await PayBill.findOne({
       employee: employee._id,
-      month,
-      year,
+      pay_date,
       status: "Posted",  // Make sure the pay bill is marked as 'Posted'
     });
 

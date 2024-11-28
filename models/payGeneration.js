@@ -43,6 +43,11 @@ const payGenerationSchema = new mongoose.Schema(
       type: Date,
       required: true,
     },
+    status: {
+      type: String,
+      enum: ["Pending", "Posted"],
+      default: "Pending",
+    },
   },
   { timestamps: true }
 );

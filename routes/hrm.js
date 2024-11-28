@@ -24,12 +24,12 @@ router.post('/hrm/designations/:euId', isSignedIn, hasHRMRights, getDesignations
 // router.get('/hrm/paybill/:payBillId', isSignedIn, getPayBillById, hrmController.getPayBill);  // Get pay bill by payBillId
 router.post('/hrm/paybill/gen/:euId', isSignedIn,hasHRMRights, hrmController.generatePay);  // Create new pay bill
 router.post('/hrm/paybill/:euId', isSignedIn,hasHRMRights, hrmController.getPayByEmployee);  // Create new pay bill
-router.post('/hrm/paybill/:euId', isSignedIn,hasHRMRights, hrmController.postPayBill);  // Create new pay bill
+router.post('/hrm/paybill/post/:euId', isSignedIn,hasHRMRights, hrmController.postPayBill);  // Create new pay bill
 // router.put('/hrm/paybill/:payBillId', isSignedIn, getPayBillById, hrmController.updatePayBill);  // Update pay bill by payBillId
 // router.delete('/hrm/paybill/:payBillId', isSignedIn, getPayBillById, hrmController.deletePayBill);  // Delete pay bill by payBillId
 
 // Pay Slip Routes
-router.get('/hrm/payslip/:empId/:euId', isSignedIn,hasHRMRights, hrmController.getPaySlip);  // Get pay slip by paySlipId
+router.post('/hrm/payslip/:euId', isSignedIn,hasHRMRights, hrmController.getPaySlip);  // Get pay slip by paySlipId
 // router.post('/hrm/payslip', isSignedIn, hrmController.generatePaySlip);  // Generate new pay slip
 
 // Remittance Routes
