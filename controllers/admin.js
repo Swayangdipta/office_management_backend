@@ -134,7 +134,11 @@ exports.pushIntoDesignation = async (req,res) => {
 
 exports.popFromDesignation = async (req,res) => {
     try {
-        const designation = req.designation
+        const designation = await Designations.findOne({ employees: employeeId });
+
+        if (!designation) {
+            return res.status(400).json({error: 'No designation found for the given employee ID', message: designation})
+        }
 
         const updatedDesignation = await designation.updateOne({$pull: {employees: req.savedEmployee._id}})
 
@@ -143,7 +147,7 @@ exports.popFromDesignation = async (req,res) => {
         }
         
 
-        return res.status(200).json({success: 'Employee popped from designation successfully!', message: updatedDesignation})
+        return res.status(200).json({success: req.deletedEmployee, message: updatedDesignation})
     } catch (error) {
         return res.status(500).json({error: 'Internal Server Error!', message: error})
     }

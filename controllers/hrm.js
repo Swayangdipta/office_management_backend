@@ -92,7 +92,7 @@ exports.createEmployee = async (req,res,next) => {
 
 exports.updateEmployee = async (req, res) => {
     try {
-        const employee = req.employee
+        let employee = req.employee
 
         employee = _.extend(employee, req.body)
 
@@ -104,6 +104,8 @@ exports.updateEmployee = async (req, res) => {
 
         return res.status(200).json({success: 'Employee updated successfully!', message: updatedEmployee})
     } catch (error) {
+      console.log(error);
+      
         return res.status(500).json({error: 'Internal Server Error!', message: error})
     }
 }
@@ -118,7 +120,7 @@ exports.deleteEmployee = async (req, res,next) => {
             return res.status(400).json({error: 'Failed to delete employee!', message: deletedEmployee})
         }
 
-        req.deletedEmployee = {success: 'Employee deleted successfully!'}
+        req.deletedEmployee = 'Employee deleted successfully!'
 
         next()
     } catch (error) {
@@ -173,6 +175,14 @@ exports.getEmployees = async (req, res) => {
     });
   }
 };
+
+exports.getEmployee = async (req, res) => {
+  if(req.employee){
+    return res.status(200).json({success: true, data: req.employee})
+  }
+
+  return res.status(404).json({error: "Employee not found!"})
+}
 
 // Pay Generation and processing
 
@@ -344,6 +354,7 @@ exports.postRemittance = async (req, res) => {
   try {
     const { remittance_type, remittance_date } = req.body;
 
+    // Validate input
     if (!remittance_type || !remittance_date) {
       return res.status(400).json({
         error: "Remittance type and date are required",
@@ -351,6 +362,7 @@ exports.postRemittance = async (req, res) => {
       });
     }
 
+    // Validate remittance type
     if (!["TDS", "PF", "GIS"].includes(remittance_type)) {
       return res.status(400).json({
         error: "Invalid Remittance Type",
@@ -358,7 +370,7 @@ exports.postRemittance = async (req, res) => {
       });
     }
 
-    // Fetch pay bills where the status is "Posted"
+    // Fetch pay bills with "Posted" status
     const payBills = await PayBill.find({ status: "Posted" });
 
     if (!payBills || payBills.length === 0) {
@@ -369,7 +381,7 @@ exports.postRemittance = async (req, res) => {
 
     const remittances = [];
 
-    // Process remittance for each pay bill
+    // Process each pay bill
     for (const bill of payBills) {
       let amount;
 
@@ -388,37 +400,56 @@ exports.postRemittance = async (req, res) => {
           amount = 0;
       }
 
-      if (amount && amount > 0) {
-        // Create a remittance record
-        const remittance = new Remittance({
-          remittance_type,
-          employee: bill.employee,
-          amount,
-          remittance_date,
-        });
-
-        const savedRemittance = await remittance.save();
-        remittances.push(savedRemittance);
+      // Skip if amount is invalid or zero
+      if (!amount || amount <= 0) {
+        continue;
       }
+
+      // Check for existing remittance
+      const existingRemittance = await Remittance.findOne({
+        remittance_type,
+        employee: bill.employee,
+        remittance_date,
+      });
+
+      if (existingRemittance) {
+        // Skip duplicates
+        continue;
+      }
+
+      // Create and save new remittance
+      const remittance = new Remittance({
+        remittance_type,
+        employee: bill.employee,
+        amount,
+        remittance_date,
+      });
+
+      const savedRemittance = await remittance.save();
+      remittances.push(savedRemittance);
     }
 
+    // Handle cases where no remittances were created
     if (remittances.length === 0) {
       return res.status(400).json({
         error: "No valid remittance records found for posting",
       });
     }
 
+    // Success response
     return res.status(200).json({
       success: "Remittances posted successfully!",
       remittances,
     });
   } catch (error) {
+    // Error handling
     return res.status(500).json({
       error: "Internal Server Error",
       message: error.message,
     });
   }
 };
+
 
 // Pay slip
 
@@ -499,26 +530,35 @@ exports.getPaySlip = async (req, res) => {
 
 exports.generateLPC = async (req, res) => {
   try {
-    const { emp_id, month, year } = req.body;
+    const { _id, pay_date } = req.body;
+    const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
-    if (!emp_id || !month || !year) {
+    if (!_id || !pay_date) {
       return res.status(400).json({
         error: "Bad Request",
-        message: "Employee ID, month, and year are required.",
+        message: "Employee ID, Pay Date are required.",
       });
     }
 
+    // Convert pay_date to start and end of the day range
+    const startOfDay = new Date(pay_date); // Sets time to 00:00:00
+    const endOfDay = new Date(pay_date); 
+    endOfDay.setUTCDate(endOfDay.getUTCDate() + 1); // Sets to the next day's 00:00:00
+
+    // Extract month and year from pay_date
+    const month = months[parseInt(pay_date.split("-")[1]) - 1];
+    const year = pay_date.split("-")[0];
+
     // Find the employee by employee ID
-    const employee = await Employee.findOne({ emp_id });
+    const employee = await Employee.findOne({ _id });
     if (!employee) {
       return res.status(404).json({ error: "Employee not found!" });
     }
 
-    // Fetch the pay bill for the final month (LPC)
+    // Fetch the pay bill for the given pay_date (the full date range for the specified day)
     const payBill = await PayBill.findOne({
       employee: employee._id,
-      month,
-      year,
+      pay_date: { $gte: startOfDay, $lt: endOfDay }, // Ensure the pay_date falls within the specified day
       status: "Posted",  // Ensure the pay bill is posted
     });
 
@@ -569,9 +609,11 @@ exports.generateLPC = async (req, res) => {
   }
 };
 
+
 // Reports
 // Employee Master Report
 
+// Employee Master Report (doesn't depend on dates)
 exports.generateEmployeeMasterReport = async (req, res) => {
   try {
     const employees = await Employee.find({});
@@ -589,25 +631,25 @@ exports.generateEmployeeMasterReport = async (req, res) => {
   }
 };
 
-// Pay Gen & Processing Reports
-
+// Pay Generation Report
 exports.generatePayGenerationReport = async (req, res) => {
   try {
-    const { month, year } = req.body;
-
-    if (!month || !year) {
-      return res.status(400).json({ error: "Month and year are required." });
-    }
-
-    // Fetch pay generation data for the given month and year
-    const payBills = await PayBill.find({ month, year });
+    const payBills = await PayBill.aggregate([
+      {
+        $group: {
+          _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } }, // Group by date
+          records: { $push: "$$ROOT" }, // Collect all matching records
+        },
+      },
+      { $sort: { _id: 1 } }, // Sort by date (ascending)
+    ]);
 
     if (!payBills || payBills.length === 0) {
-      return res.status(404).json({ error: "No pay generation data found for the given month and year." });
+      return res.status(404).json({ error: "No pay generation data found." });
     }
 
     return res.status(200).json({
-      success: "Pay generation report generated successfully.",
+      success: "Pay generation report grouped by date generated successfully.",
       report: payBills,
     });
   } catch (error) {
@@ -615,25 +657,26 @@ exports.generatePayGenerationReport = async (req, res) => {
   }
 };
 
-// pay bill posting reports
-
+// Pay Bill Posting Report
 exports.generatePayBillPostingReport = async (req, res) => {
   try {
-    const { month, year } = req.body;
-
-    if (!month || !year) {
-      return res.status(400).json({ error: "Month and year are required." });
-    }
-
-    // Fetch pay bill postings for the given month and year
-    const payBillPostings = await PayBill.find({ month, year, status: 'posted' });
+    const payBillPostings = await PayBill.aggregate([
+      { $match: { status: 'posted' } }, // Filter only posted records
+      {
+        $group: {
+          _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } }, // Group by date
+          records: { $push: "$$ROOT" }, // Collect all matching records
+        },
+      },
+      { $sort: { _id: 1 } }, // Sort by date (ascending)
+    ]);
 
     if (!payBillPostings || payBillPostings.length === 0) {
-      return res.status(404).json({ error: "No pay bill postings found for the given month and year." });
+      return res.status(404).json({ error: "No pay bill postings found." });
     }
 
     return res.status(200).json({
-      success: "Pay bill posting report generated successfully.",
+      success: "Pay bill posting report grouped by date generated successfully.",
       report: payBillPostings,
     });
   } catch (error) {
@@ -641,30 +684,31 @@ exports.generatePayBillPostingReport = async (req, res) => {
   }
 };
 
-// Remittances Report
-
+// Remittances Posting Report
 exports.generateRemittancesPostingReport = async (req, res) => {
   try {
-    const { month, year } = req.body;
-
-    if (!month || !year) {
-      return res.status(400).json({ error: "Month and year are required." });
-    }
-
-    // Fetch remittance data for the given month and year
-    const remittances = await Remittance.find({ month, year });
+    const remittances = await Remittance.aggregate([
+      {
+        $group: {
+          _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } }, // Group by date
+          records: { $push: "$$ROOT" }, // Collect all matching records
+        },
+      },
+      { $sort: { _id: 1 } }, // Sort by date (ascending)
+    ]);
 
     if (!remittances || remittances.length === 0) {
-      return res.status(404).json({ error: "No remittance postings found for the given month and year." });
+      return res.status(404).json({ error: "No remittance postings found." });
     }
 
     return res.status(200).json({
-      success: "Remittance posting report generated successfully.",
+      success: "Remittance posting report grouped by date generated successfully.",
       report: remittances,
     });
   } catch (error) {
     return res.status(500).json({ error: "Internal Server Error", message: error.message });
   }
 };
+
 
 // Pay Slip Report
