@@ -53,9 +53,9 @@ router.get("/sars/asset-type/:euId",getAllAssetTypes)
 router.get("/sars/stock-type/:euId",getAllStockTypes)
 
 // Reports Routes for Agency Users
-router.get("/sars/reports/asset-categories", generateAssetCategoriesReport);  // Asset Categories Report
-router.get("/sars/reports/asset-details", generateAssetDetailsReport);  // Asset Details Report
-router.get("/sars/reports/stock-types", generateStockTypesReport);  // Stock Types Report
-router.get("/sars/reports/stock-details", generateStockDetailsReport);  // Stock Details Report
+router.get("/sars/reports/asset-categories/:euId", generateAssetCategoriesReport);  // Asset Categories Report
+router.get("/sars/reports/asset-details/:euId", generateAssetDetailsReport);  // Asset Details Report
+router.get("/sars/reports/stock-types/:euId", generateStockTypesReport);  // Stock Types Report
+router.get("/sars/reports/stock-details/:euId", generateStockDetailsReport);  // Stock Details Report
 
 module.exports = router;
