@@ -10,6 +10,7 @@ const PORT = process.env.PORT || 8080
 const authRoutes = require('./routes/auth')
 const hrmRoutes = require('./routes/hrm')
 const adminRoutes = require('./routes/admin')
+const sarsRoutes = require('./routes/sars')
 
 const corsOptions = {
     origin: ['https://offmgmt.netlify.app', 'http://localhost:5173'],
@@ -25,6 +26,7 @@ app.use(cors(corsOptions))
 app.use('/api',authRoutes)
 app.use('/api',hrmRoutes)
 app.use('/api',adminRoutes)
+app.use('/api',sarsRoutes)
 
 // Connecting to Dtabase and Starting the Server
 dbConnection(app, PORT)
