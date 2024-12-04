@@ -55,22 +55,23 @@ exports.createDesignation = async (req,res) => {
         const designation = await Designations.create(req.body)
 
         if(!designation || designation.errors ){
-            return res.status(400).json({error: 'Failed to create designation!', message: designation.errors})
+            return res.status(400).json({error: 'Failed to create designation!', data: designation.errors})
         }
 
-        return res.status(200).json({success: 'Designation created successfully!', message: designation })
+        return res.status(200).json({success: 'Designation created successfully!', data: designation })
     } catch (error) {
-        return res.status(500).json({error: 'Internal Server Error!', message: error})
+        return res.status(500).json({error: 'Internal Server Error!', data: error})
     }
 }
 
 exports.getDesignations = async (req,res) => {
     try {
         const designations = await Designations.find()
+        
         if(!designations || designations.errors ){
             return res.status(404).json({error: 'No designations found!'})
         }
-        return res.status(200).json({success: 'Designations found successfully!', message: designations})
+        return res.status(200).json({success: 'Designations found successfully!', data: designations})
     } catch (error) {
         return res.status(500).json({error: 'Internal Server Error!', message: error})
     }
@@ -89,10 +90,10 @@ exports.updateDesignation = async (req,res) => {
         const updatedDesignation = await designation.save()
 
         if(!updatedDesignation || updatedDesignation.errors ){
-            return res.status(400).json({error: 'Failed to update designation!', message: updatedDesignation})
+            return res.status(400).json({error: 'Failed to update designation!', data: updatedDesignation})
         }
 
-        return res.status(200).json({success: 'Designation updated successfully!', message: updatedDesignation})
+        return res.status(200).json({success: 'Designation updated successfully!', data: updatedDesignation})
 
     } catch (error) {
         return res.status(500).json({error: 'Internal Server Error!', message: error})
@@ -103,15 +104,15 @@ exports.removeDesignation = async (req,res) => {
     try {
         const designation = req.designation
 
-        const deletedDesignation = await designation.remove()
+        const deletedDesignation = await designation.deleteOne()
 
         if(!deletedDesignation || deletedDesignation.errors ){
-            return res.status(400).json({error: 'Failed to delete designation!', message: deletedDesignation})
+            return res.status(400).json({error: 'Failed to delete designation!', data: deletedDesignation})
         }
 
-        return res.status(200).json({success: 'Designation deleted successfully!', message: deletedDesignation})
+        return res.status(200).json({success: 'Designation deleted successfully!', data: deletedDesignation})
     } catch (error) {
-        return res.status(500).json({error: 'Internal Server Error!', message: error})
+        return res.status(500).json({error: 'Internal Server Error!', data: error})
     }   
 }
 
