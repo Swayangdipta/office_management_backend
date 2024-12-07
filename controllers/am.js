@@ -316,6 +316,32 @@ exports.getAllVouchers = async (req, res) => {
 };
 
 // Bank Transactions
+
+// Create a new bank transaction
+exports.createBankTransaction = async (req, res) => {
+  try {
+    const { date, description, debit, credit, voucher } = req.body;
+
+    // Create a new BankTransaction instance
+    const bankTransaction = new BankTransaction({
+      date,
+      description,
+      debit,
+      credit,
+      voucher,
+    });
+
+    // Save the transaction to the database
+    const savedTransaction = await bankTransaction.save();
+
+    // Send a success response
+    res.status(201).json({ success: true, data: savedTransaction });
+  } catch (error) {
+    // Handle any errors
+    res.status(400).json({ success: false, data: 'Failed to create bank transaction', error });
+  }
+};
+
 // Generate Bank Statements
 exports.generateBankStatement = async (req, res) => {
   try {
