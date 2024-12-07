@@ -16,8 +16,21 @@ const {
     getAllAssetTypes,
     getAssetTypeById,
     getAllStockTypes,
-    getStockTypeById
+    getStockTypeById,
+    generateAssetDetailsReport,
+    generateStockDetailsReport
   } = require('../controllers/sars');
+
+const {
+  createAccountingHead,
+  updateAccountingHead,
+  deleteAccountingHead,
+  getAccountingHeads,
+  getAccountingHeadById,
+  getAllAccountingHeads,
+} = require('../controllers/am')
+
+const { isAdministrator, isSignedIn } = require('../controllers/auth');
 
 const router = require('express').Router()
 
@@ -26,6 +39,7 @@ router.param('categoryId',getAssetCategoryById)
 router.param('typeId',getAssetTypeById)
 router.param('stockId',getStockTypeById)
 router.param('degnId',getDesignationById)
+router.param('accountHeadId',getAccountingHeadById)
 
 router.post('/admin/cr/designation',createDesignation)
 
@@ -81,6 +95,15 @@ router.get("/admin/stock-types/:adminId", getAllStockTypes);  // Create Stock Ty
 router.post("/admin/stock-types/:adminId", createStockType);  // Create Stock Type
 router.put("/admin/stock-types/:stockId/:adminId", updateStockType);  // Update Stock Type
 router.delete("/admin/stock-types/:stockId/:adminId", deleteStockType);  // Delete Stock Type
+
+// Accounting Head (System Admin Only)
+router.post('/admin/accounting-head/create/:adminId', isSignedIn, isAdministrator, createAccountingHead);      // Create
+router.put('/admin/accounting-head/:accountHeadId/:adminId', isSignedIn, isAdministrator, updateAccountingHead);         // Update
+router.delete('/admin/accounting-head/:accountHeadId/:adminId', isSignedIn, isAdministrator, deleteAccountingHead);     // Delete
+router.post('/admin/accounting-head/:adminId', isSignedIn, isAdministrator, getAllAccountingHeads);           // Get All
+
+router.get("/admin/reports/asset-details/:adminId", generateAssetDetailsReport);  // Asset Details Report
+router.get("/admin/reports/stock-details/:adminId", generateStockDetailsReport);  // Stock Details Report
 
 
 module.exports = router

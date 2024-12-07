@@ -4,6 +4,7 @@ const AssetType = require("../models/assetType");
 const Depreciation = require("../models/depreciation");
 const StockType = require('../models/stockType');
 const StockDetails = require('../models/stockDetails.js');
+const AccountingHead = require('../models/accountingHead.js');
 
 // Get Asset Category by ID
 exports.getAssetCategoryById = async (req, res, next, id) => {
@@ -159,20 +160,45 @@ exports.getAllAssetCategories = async (req, res) => {
 // Create Asset Details
 exports.createAssetDetails = async (req, res) => {
   try {
-    const { assetType, registrationId, purchaseDate, model, purchaseValue } = req.body;
+    const { assetType, registrationId, purchaseDate, model, purchaseValue, accountingHead } = req.body;
 
-    if (!assetType || !registrationId || !purchaseDate || !purchaseValue) {
+    // Validate required fields
+    if (!assetType || !registrationId || !purchaseDate || !purchaseValue || !accountingHead) {
       return res.status(400).json({ error: "All required fields must be filled!" });
     }
 
-    const assetDetails = new AssetDetails({ assetType, registrationId, purchaseDate, model, purchaseValue });
+    // Validate accountingHead existence
+    const accountingHeadExists = await AccountingHead.findById(accountingHead);
+    if (!accountingHeadExists) {
+      return res.status(400).json({ error: "Invalid accounting head" });
+    }
+
+    // Create new AssetDetails
+    const assetDetails = new AssetDetails({
+      assetType,
+      registrationId,
+      purchaseDate,
+      model,
+      purchaseValue,
+      accountingHead,
+    });
+
+    // Save AssetDetails
     const savedDetails = await assetDetails.save();
 
-    return res.status(201).json({ success: "Asset Details created successfully!", data: savedDetails });
+    // Update the AccountingHead with the new AssetDetails
+    accountingHeadExists.assets.push(savedDetails._id);
+    await accountingHeadExists.save();
+
+    return res.status(201).json({
+      success: "Asset Details created successfully!",
+      data: savedDetails,
+    });
   } catch (error) {
-    return res.status(500).json({ error: "Internal Server Error!", message: error });
+    return res.status(500).json({ error: "Internal Server Error!", message: error.message });
   }
 };
+
 
 // Update Asset Details
 exports.updateAssetDetails = async (req, res) => {
@@ -209,7 +235,7 @@ exports.deleteAssetDetails = async (req, res) => {
 // Get All Asset Details
 exports.getAllAssetDetails = async (req, res) => {
   try {
-    const assetDetails = await AssetDetails.find().populate('assetType');
+    const assetDetails = await AssetDetails.find().populate('assetType').populate('accountingHead');
     return res.status(200).json({ success: "Asset Details fetched successfully!", data: assetDetails });
   } catch (error) {
     return res.status(500).json({ error: "Internal Server Error!", message: error });
@@ -430,21 +456,42 @@ exports.getAllStockTypes = async (req, res) => {
 // Create Stock Details (Agency Users Only)
 exports.createStockDetails = async (req, res) => {
   try {
-    const { stockType, registrationId, model, purchaseDate, purchaseValue } = req.body;
+    const { stockType, registrationId, model, purchaseDate, purchaseValue, accountingHead } = req.body;
 
-    if (!stockType || !registrationId || !model || !purchaseDate || !purchaseValue) {
+    // Validate required fields
+    if (!stockType || !registrationId || !model || !purchaseDate || !purchaseValue || !accountingHead) {
       return res.status(400).json({ error: "All fields are required" });
     }
 
-    const newStockDetails = new StockDetails({ stockType, registrationId, model, purchaseDate, purchaseValue });
+    // Validate accountingHead existence
+    const accountingHeadExists = await AccountingHead.findById(accountingHead);
+    if (!accountingHeadExists) {
+      return res.status(400).json({ error: "Invalid accounting head" });
+    }
+
+    // Create new StockDetails
+    const newStockDetails = new StockDetails({
+      stockType,
+      registrationId,
+      model,
+      purchaseDate,
+      purchaseValue,
+      accountingHead,
+    });
+
+    // Save StockDetails
     const savedStockDetails = await newStockDetails.save();
+
+    // Update the AccountingHead with the new StockDetails
+    accountingHeadExists.stocks.push(savedStockDetails._id);
+    await accountingHeadExists.save();
 
     return res.status(201).json({
       success: 'Stock details created successfully',
-      data: savedStockDetails
+      data: savedStockDetails,
     });
   } catch (error) {
-    return res.status(500).json({ error: 'Internal Server Error', message: error });
+    return res.status(500).json({ error: 'Internal Server Error', message: error.message });
   }
 };
 
@@ -482,7 +529,7 @@ exports.updateStockDetails = async (req, res) => {
 // Get All Stock Details
 exports.getAllStockDetails = async (req, res) => {
   try {
-    const stockDetails = await StockDetails.find().populate('stockType');
+    const stockDetails = await StockDetails.find().populate('stockType').populate('accountingHead');
 
     return res.status(200).json({
       success: 'Stock details fetched successfully',

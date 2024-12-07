@@ -230,3 +230,27 @@ exports.hasHRMRights = (req,res,next) => {
         return res.status(500).json({error: 'Internal Server Error!', message: error})
     }
 }
+
+exports.hasSAMRights = (req,res,next) => {
+    try {
+        if(req.endUser.role !== 'SAM'){
+            return res.status(403).json({errors: ["You don't have the rights."]})
+        }
+
+        next()
+    } catch (error) {
+        return res.status(500).json({error: 'Internal Server Error!', message: error})
+    }
+}
+
+exports.hasAMRights = (req,res,next) => {
+    try {
+        if(req.endUser.role !== 'AM'){
+            return res.status(403).json({errors: ["You don't have the rights."]})
+        }
+
+        next()
+    } catch (error) {
+        return res.status(500).json({error: 'Internal Server Error!', message: error})
+    }
+}

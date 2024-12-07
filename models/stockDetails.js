@@ -22,6 +22,11 @@ const stockDetailsSchema = new mongoose.Schema({
     type: Number,
     required: true,
   },
+  accountHead: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "AccountHead", // Reference to the Accounting Head model
+    required: true,
+  },
 }, { timestamps: true });
 
-module.exports = mongoose.model('StockDetails', stockDetailsSchema);
+module.exports = mongoose.models.StockDetails || mongoose.model('StockDetails', stockDetailsSchema);
