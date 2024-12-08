@@ -54,7 +54,7 @@ router.post('/am/voucher/ah/:euId', getAllAccountingHeads);                  // 
 // Bank Reconciliation (End User)
 router.post('/am/bank-reconciliation/create/:euId', createBankTransaction); // Generate Bank Statement
 router.post('/am/bank-reconciliation/statement/:euId', generateBankStatement); // Generate Bank Statement
-router.post('/am/bank-reconciliation/reconcile/:euId', reconcileTransaction); // Reconcile Bank Transactions
+router.post('/am/bank-reconciliation/reconcile/:euId/:transactionId', reconcileTransaction); // Reconcile Bank Transactions
 
 // Process (End User)
 router.post('/am/process/close-month', closeMonth);  // Month Closing
