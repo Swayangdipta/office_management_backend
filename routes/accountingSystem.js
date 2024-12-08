@@ -27,7 +27,11 @@ const {
   getVoucherById,
   getAllVouchers,
   getAllAccountingHeads,
-  createBankTransaction
+  createBankTransaction,
+  trialBalance,
+  profitAndLoss,
+  balanceSheet,
+  ledgers
 } = require('../controllers/am');
 
 router.param('partyId',getPartyById)
@@ -57,13 +61,13 @@ router.post('/am/bank-reconciliation/statement/:euId', generateBankStatement); /
 router.post('/am/bank-reconciliation/reconcile/:euId/:transactionId', reconcileTransaction); // Reconcile Bank Transactions
 
 // Process (End User)
-router.post('/am/process/close-month', closeMonth);  // Month Closing
-router.post('/am/process/close-year', closeYear);    // Year Closing
+router.post('/am/process/close-month/:euId', closeMonth);  // Month Closing
+router.post('/am/process/close-year/:euId', closeYear);    // Year Closing
 
 // Reports (End User)
-// router.get('/am/reports/trial-balance', getTrialBalance);        // Trial Balance Report
-// router.get('/am/reports/profit-loss', getProfitAndLoss);          // Profit and Loss Account
-// router.get('/am/reports/balance-sheet', getBalanceSheet);         // Balance Sheet
-// router.get('/am/reports/ledgers', getLedgers);                    // Ledgers
+router.get('/am/reports/trial-balance/:euId', trialBalance);        // Trial Balance Report
+router.get('/am/reports/profit-loss/:euId', profitAndLoss);          // Profit and Loss Account
+router.get('/am/reports/balance-sheet/:euId', balanceSheet);         // Balance Sheet
+router.get('/am/reports/ledgers/:euId', ledgers);                    // Ledgers
 
 module.exports = router;
