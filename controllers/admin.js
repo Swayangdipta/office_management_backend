@@ -77,6 +77,19 @@ exports.getDesignations = async (req,res) => {
     }
 }
 
+exports.getEndUsers = async (req,res) => {
+    try {
+        const endUsers = await EndUser.find()
+        
+        if(!endUsers || endUsers.errors ){
+            return res.status(404).json({error: 'No End Users found!'})
+        }
+        return res.status(200).json({success: 'End Users found successfully!', data: endUsers})
+    } catch (error) {
+        return res.status(500).json({error: 'Internal Server Error!', message: error})
+    }
+}
+
 exports.updateDesignation = async (req,res) => {
     try {
         const designation = req.designation
