@@ -36,34 +36,34 @@ router.param('voucherId',getVoucherById)
 // ----------------------------- END USER ROUTES -----------------------------
 
 // Party Master (End User)
-router.post('/am/party-master/create/:euId', createParty);        // Create
-router.put('/am/party-master/:partyId/:euId', updateParty);           // Update
-router.delete('/am/party-master/:partyId/:euId', deleteParty);       // Delete
-router.post('/am/party-master/all/:euId', getAllParties);             // Get All
+router.post('/am/party-master/create', createParty);        // Create
+router.put('/am/party-master/:partyId', updateParty);           // Update
+router.delete('/am/party-master/:partyId', deleteParty);       // Delete
+router.post('/am/party-master/all', getAllParties);             // Get All
 
 // Voucher Preparation (End User)
-router.post('/am/voucher/create/:euId', createVoucher);           // Create Voucher
-router.put('/am/voucher/:voucherId/:euId', updateVoucher);               // Update Voucher
-router.post('/am/voucher/v/:voucherId/:euId', getVoucher);                  // Get Voucher
-router.post('/am/voucher/:euId', getAllVouchers);                  // Get Voucher
-router.post('/am/voucher/ah/:euId', getAllAccountingHeads);                  // Get Voucher
+router.post('/am/voucher/create', createVoucher);           // Create Voucher
+router.put('/am/voucher/:voucherId', updateVoucher);               // Update Voucher
+router.post('/am/voucher/v/:voucherId', getVoucher);                  // Get Voucher
+router.post('/am/voucher', getAllVouchers);                  // Get Voucher
+router.post('/am/voucher/ah', getAllAccountingHeads);                  // Get Voucher
 
 // Transaction Entry (End User)
 // router.post('/am/voucher/transaction', createTransaction);   // Add Transaction
 
 // Bank Reconciliation (End User)
-router.post('/am/bank-reconciliation/create/:euId', createBankTransaction); // Generate Bank Statement
-router.post('/am/bank-reconciliation/statement/:euId', generateBankStatement); // Generate Bank Statement
-router.post('/am/bank-reconciliation/reconcile/:euId/:transactionId', reconcileTransaction); // Reconcile Bank Transactions
+router.post('/am/bank-reconciliation/create', createBankTransaction); // Generate Bank Statement
+router.post('/am/bank-reconciliation/statement', generateBankStatement); // Generate Bank Statement
+router.post('/am/bank-reconciliation/reconcile/:transactionId', reconcileTransaction); // Reconcile Bank Transactions
 
 // Process (End User)
-router.post('/am/process/close-month/:euId', closeMonth);  // Month Closing
-router.post('/am/process/close-year/:euId', closeYear);    // Year Closing
+router.post('/am/process/close-month', closeMonth);  // Month Closing
+router.post('/am/process/close-year', closeYear);    // Year Closing
 
 // Reports (End User)
-router.get('/am/reports/trial-balance/:euId', trialBalance);        // Trial Balance Report
-router.get('/am/reports/profit-loss/:euId', profitAndLoss);          // Profit and Loss Account
-router.get('/am/reports/balance-sheet/:euId', balanceSheet);         // Balance Sheet
-router.get('/am/reports/ledgers/:euId', ledgers);                    // Ledgers
+router.get('/am/reports/trial-balance', trialBalance);        // Trial Balance Report
+router.get('/am/reports/profit-loss', profitAndLoss);          // Profit and Loss Account
+router.get('/am/reports/balance-sheet', balanceSheet);         // Balance Sheet
+router.get('/am/reports/ledgers', ledgers);                    // Ledgers
 
 module.exports = router;

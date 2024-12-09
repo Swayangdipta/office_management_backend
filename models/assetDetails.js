@@ -23,9 +23,9 @@ const assetDetailsSchema = new mongoose.Schema({
       type: Number,
       required: true,
     },
-    accountHead: {
+    accountingHead: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "AccountHead", // Reference to the Accounting Head model
+      ref: "AccountingHead", // Reference to the Accounting Head model
       required: true,
     },
   }, { timestamps: true });

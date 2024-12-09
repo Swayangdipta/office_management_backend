@@ -56,7 +56,7 @@ exports.getRemittanceById = async (req, res, next, remittanceId) => {
 exports.createEmployee = async (req,res,next) => {
     try {
         const {fullname, date_of_birth, cid, emp_id, tpn_acc_num, has_gis, gis_acc_num, has_pf, pf_acc_num, sav_acc_num, bank_name, bank_branch, benefits, deductions, qualifications} = req.body
-
+        
         if (
             !fullname ||
             !date_of_birth ||
@@ -140,8 +140,8 @@ exports.getEmployees = async (req, res) => {
 
     // Fetch employees with pagination
     const employees = await Employee.find()
-      .skip(offset)
-      .limit(limit)
+      // .skip(offset)
+      // .limit(limit)
       .select("_id fullname emp_id date_of_birth")
       .exec();
 
