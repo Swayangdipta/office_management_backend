@@ -1,6 +1,37 @@
 const Administrator = require("../models/administrator");
 const Designations = require("../models/designations");
 const EndUser = require('../models/endUser')
+// Import your Mongoose models
+const Employee = require('../models/employee');
+const AssetDetail = require('../models/assetDetails');
+const StockDetail = require('../models/stockDetails');
+const Voucher = require('../models/voucher');
+const BankTransaction = require('../models/bankTransaction');
+
+exports.getTotals =  async (req, res) => {
+  try {
+    // Fetch counts for each collection
+    const employeeCount = await Employee.countDocuments();
+    const endUserCount = await EndUser.countDocuments();
+    const assetDetailsCount = await AssetDetail.countDocuments();
+    const stockDetailsCount = await StockDetail.countDocuments();
+    const voucherCount = await Voucher.countDocuments();
+    const bankTransactionCount = await BankTransaction.countDocuments();
+
+    // Send the counts in the response
+    res.json({
+      employees: employeeCount,
+      endUsers: endUserCount,
+      assetDetails: assetDetailsCount,
+      stockDetails: stockDetailsCount,
+      vouchers: voucherCount,
+      bankReconciliations: bankTransactionCount,
+    });
+  } catch (error) {
+    console.error('Error fetching totals:', error);
+    res.status(500).json({ error: 'An error occurred while fetching totals.' });
+  }
+}
 
 exports.getAdminById = async (req,res,next,id) => {
     try {

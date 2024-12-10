@@ -1,4 +1,4 @@
-const { getAdminById, createDesignation, getDesignationById, updateDesignation, removeDesignation, getDesignations, getEndUsers } = require('../controllers/admin')
+const { getAdminById, createDesignation, getDesignationById, updateDesignation, removeDesignation, getDesignations, getEndUsers, getTotals } = require('../controllers/admin')
 const {
     createAssetCategory,
     updateAssetCategory,
@@ -107,6 +107,8 @@ router.get("/admin/reports/stock-details/:adminId", generateStockDetailsReport);
  // Stock Details Report
 router.post("/admin/eu/:adminId", getEndUsers);
 router.post("/admin/eu/cr/:adminId", createEndUsers);
+
+router.post("/admin/totals/:adminId", isSignedIn, isAdministrator, getTotals)
 
 
 module.exports = router
