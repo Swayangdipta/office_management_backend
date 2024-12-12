@@ -315,6 +315,19 @@ exports.getAllVouchers = async (req, res) => {
   }
 };
 
+exports.getLastFourVouchers = async (req, res) => {
+  try {
+    const vouchers = await Voucher.find({})
+      .sort({ date: -1 })
+      .limit(4)
+      .populate('payee')
+      .populate('transactions.accountHead');
+
+    res.status(200).json({ success: true, data: vouchers });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Failed to fetch last four vouchers', error });
+  }
+};
 // Bank Transactions
 
 // Create a new bank transaction
@@ -381,6 +394,19 @@ exports.getReconciledTransactions = async (req, res) => {
     res.status(200).json({ success: true, data: reconciledTransactions });
   } catch (error) {
     res.status(500).json({ success: false, data: 'Failed to fetch reconciled transactions', error });
+  }
+};
+
+exports.getLastFourTransactions = async (req, res) => {
+  try {
+    const transactions = await BankTransaction.find({})
+      .populate('voucher', 'narration voucherType')
+      .sort({ date: -1 })
+      .limit(4);
+
+    res.status(200).json({ success: true, data: transactions });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Failed to fetch last four bank transactions', error });
   }
 };
 
@@ -452,32 +478,48 @@ exports.closeYear = async (req, res) => {
 };
 
 // Trial Balance
+// Trial Balance
 exports.trialBalance = async (req, res) => {
   try {
-    // Fetch all vouchers and bank transactions
-    const vouchers = await Voucher.find();
-    const bankTransactions = await BankTransaction.find();
+    const { startDate, endDate } = req.body;
 
-    // Logic to calculate Trial Balance (simplified for this example)
+    const parsedStartDate = new Date(startDate);
+    const parsedEndDate = new Date(endDate);
+
+    if (isNaN(parsedStartDate.getTime()) || isNaN(parsedEndDate.getTime())) {
+      throw new Error('Invalid date format.');
+    }
+
+    // Convert to ISO strings
+    const formattedStartDate = parsedStartDate.toISOString();
+    const formattedEndDate = parsedEndDate.toISOString();
+
+    const filter = {
+      date: { $gte: new Date(formattedStartDate), $lte: new Date(formattedEndDate) },
+    };
+
+    const vouchers = await Voucher.find({
+      entryDate: { $gte: new Date(startDate), $lte: new Date(endDate) },
+    });
+
+    const bankTransactions = await BankTransaction.find(filter);
+    
     let debitTotal = 0;
     let creditTotal = 0;
 
-    vouchers.forEach(voucher => {
-      voucher.transactions.forEach(tx => {
-        if (tx.transactionType === 'Debit') {
+    vouchers.forEach((voucher) => {
+      voucher.transactions.forEach((tx) => {
+        if (tx.type === 'Debit') {
           debitTotal += tx.amount;
-        } else if (tx.transactionType === 'Credit') {
+        } else if (tx.type === 'Credit') {
           creditTotal += tx.amount;
         }
       });
     });
 
-    bankTransactions.forEach(transaction => {
-      if (transaction.transactionType === 'Debit') {
-        debitTotal += transaction.amount;
-      } else if (transaction.transactionType === 'Credit') {
-        creditTotal += transaction.amount;
-      }
+    bankTransactions.forEach((transaction) => {
+        debitTotal += transaction.debit;
+        creditTotal += transaction.credit;
     });
 
     res.status(200).json({
@@ -489,103 +531,182 @@ exports.trialBalance = async (req, res) => {
       },
     });
   } catch (error) {
-    res.status(500).json({ success: false, data: 'Error generating Trial Balance', error });
+    console.log(error);
+    
+    res.status(500).json({ success: false, message: 'Error generating Trial Balance', error });
   }
 };
 
-// Profit and Loss Account
 exports.profitAndLoss = async (req, res) => {
-    try {
-      // Fetch relevant data (e.g., revenue, expenses, etc.)
-      const vouchers = await Voucher.find();
-      let revenue = 0;
-      let expenses = 0;
-  
-      vouchers.forEach(voucher => {
-        if (voucher.narration.includes('Revenue')) {
-          revenue += voucher.transactions.filter(tx => tx.transactionType === 'Credit').reduce((sum, tx) => sum + tx.amount, 0);
-        } else if (voucher.narration.includes('Expense')) {
-          expenses += voucher.transactions.filter(tx => tx.transactionType === 'Debit').reduce((sum, tx) => sum + tx.amount, 0);
+  try {
+    const { startDate, endDate } = req.body;
+
+    // Validate the input dates
+    if (!startDate || !endDate) {
+      return res.status(400).json({ success: false, message: 'Start and end dates are required.' });
+    }
+
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+
+    if (isNaN(start) || isNaN(end)) {
+      return res.status(400).json({ success: false, message: 'Invalid date format.' });
+    }
+
+    // Fetch vouchers within the date range
+    const vouchers = await Voucher.find({
+      entryDate: { $gte: start, $lte: end },
+    });
+
+    let revenue = 0;
+    let expenses = 0;
+
+    vouchers.forEach((voucher) => {
+      voucher.transactions.forEach((transaction) => {
+        if (transaction.type === 'Credit' && voucher.narration.includes('Revenue')) {
+          revenue += transaction.amount;
+        } else if (transaction.type === 'Debit' && voucher.narration.includes('Expense')) {
+          expenses += transaction.amount;
         }
       });
-  
-      const profitOrLoss = revenue - expenses;
-  
-      res.status(200).json({
-        success: true,
-        data: {
-          revenue,
-          expenses,
-          profitOrLoss,
-        },
-      });
-    } catch (error) {
-      res.status(500).json({ success: false, data: 'Error generating Profit and Loss account', error });
-    }
-  };
+    });
+
+    const profitOrLoss = revenue - expenses;
+
+    res.status(200).json({
+      success: true,
+      data: {
+        revenue,
+        expenses,
+        profitOrLoss,
+      },
+    });
+  } catch (error) {
+    console.error('Error generating Profit and Loss account:', error);
+    res.status(500).json({ success: false, message: 'Error generating Profit and Loss account', error });
+  }
+};
 
 // Balance Sheet
 exports.balanceSheet = async (req, res) => {
-    try {
-      // Fetch assets and liabilities data (simplified example)
-      const assets = await BankTransaction.find({ transactionType: 'Debit' });
-      const liabilities = await BankTransaction.find({ transactionType: 'Credit' });
-  
-      let totalAssets = assets.reduce((sum, tx) => sum + tx.amount, 0);
-      let totalLiabilities = liabilities.reduce((sum, tx) => sum + tx.amount, 0);
-  
-      const equity = totalAssets - totalLiabilities;
-  
-      res.status(200).json({
-        success: true,
-        data: {
-          totalAssets,
-          totalLiabilities,
-          equity,
-        },
-      });
-    } catch (error) {
-      res.status(500).json({ success: false, data: 'Error generating Balance Sheet', error });
+  try {
+    const { startDate, endDate } = req.body;
+
+    // Validate the input dates
+    if (!startDate || !endDate) {
+      return res.status(400).json({ success: false, message: 'Start and end dates are required.' });
     }
-  };
+
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+
+    if (isNaN(start) || isNaN(end)) {
+      return res.status(400).json({ success: false, message: 'Invalid date format.' });
+    }
+
+    // Fetch transactions within the date range
+    const transactions = await BankTransaction.find({
+      date: { $gte: start, $lte: end },
+    });
+
+    let totalAssets = 0;
+    let totalLiabilities = 0;
+
+    transactions.forEach((transaction) => {
+      totalAssets += transaction.debit || 0;
+      totalLiabilities += transaction.credit || 0;
+    });
+
+    const equity = totalAssets - totalLiabilities;
+
+    res.status(200).json({
+      success: true,
+      data: {
+        totalAssets,
+        totalLiabilities,
+        equity,
+      },
+    });
+  } catch (error) {
+    console.error('Error generating Balance Sheet:', error);
+    res.status(500).json({ success: false, message: 'Error generating Balance Sheet', error });
+  }
+};
 
 // Ledgers
 exports.ledgers = async (req, res) => {
-    try {
-      // Fetch transactions grouped by account head, party, etc.
-      const vouchers = await Voucher.find();
-      const bankTransactions = await BankTransaction.find();
-  
-      // Process and group transactions (simplified logic)
-      const ledgers = {
-        revenue: [],
-        expenses: [],
-        assets: [],
-        liabilities: [],
-      };
-  
-      vouchers.forEach(voucher => {
-        if (voucher.narration.includes('Revenue')) {
-          ledgers.revenue.push(voucher);
-        } else if (voucher.narration.includes('Expense')) {
-          ledgers.expenses.push(voucher);
-        }
-      });
-  
-      bankTransactions.forEach(transaction => {
-        if (transaction.transactionType === 'Debit') {
-          ledgers.assets.push(transaction);
-        } else if (transaction.transactionType === 'Credit') {
-          ledgers.liabilities.push(transaction);
-        }
-      });
-  
-      res.status(200).json({
-        success: true,
-        data: ledgers,
-      });
-    } catch (error) {
-      res.status(500).json({ success: false, data: 'Error generating Ledgers', error });
+  try {
+    const { startDate, endDate } = req.body;
+
+    // Validate the input dates
+    if (!startDate || !endDate) {
+      return res.status(400).json({ success: false, message: 'Start and end dates are required.' });
     }
+
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+
+    if (isNaN(start) || isNaN(end)) {
+      return res.status(400).json({ success: false, message: 'Invalid date format.' });
+    }
+
+    // Fetch vouchers and bank transactions within the date range
+    const vouchers = await Voucher.find({
+      entryDate: { $gte: start, $lte: end },
+    });
+    const bankTransactions = await BankTransaction.find({
+      date: { $gte: start, $lte: end },
+    });
+
+    const ledgers = {
+      revenue: [],
+      expenses: [],
+      assets: [],
+      liabilities: [],
+    };
+
+    // Process vouchers
+    vouchers.forEach((voucher) => {
+      voucher.transactions.forEach((transaction) => {
+        if (transaction.type === 'Credit' && voucher.narration.includes('Revenue')) {
+          ledgers.revenue.push({
+            date: voucher.entryDate,
+            description: voucher.narration,
+            amount: transaction.amount,
+          });
+        } else if (transaction.type === 'Debit' && voucher.narration.includes('Expense')) {
+          ledgers.expenses.push({
+            date: voucher.entryDate,
+            description: voucher.narration,
+            amount: transaction.amount,
+          });
+        }
+      });
+    });
+
+    // Process bank transactions
+    bankTransactions.forEach((transaction) => {
+      if (transaction.debit > 0) {
+        ledgers.assets.push({
+          date: transaction.date,
+          description: transaction.description,
+          amount: transaction.debit,
+        });
+      } else if (transaction.credit > 0) {
+        ledgers.liabilities.push({
+          date: transaction.date,
+          description: transaction.description,
+          amount: transaction.credit,
+        });
+      }
+    });
+
+    res.status(200).json({
+      success: true,
+      data: ledgers,
+    });
+  } catch (error) {
+    console.error('Error generating Ledgers:', error);
+    res.status(500).json({ success: false, message: 'Error generating Ledgers', error });
+  }
 };
-  

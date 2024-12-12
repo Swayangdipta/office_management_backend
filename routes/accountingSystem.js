@@ -61,9 +61,9 @@ router.post('/am/process/close-month', closeMonth);  // Month Closing
 router.post('/am/process/close-year', closeYear);    // Year Closing
 
 // Reports (End User)
-router.get('/am/reports/trial-balance', trialBalance);        // Trial Balance Report
-router.get('/am/reports/profit-loss', profitAndLoss);          // Profit and Loss Account
-router.get('/am/reports/balance-sheet', balanceSheet);         // Balance Sheet
-router.get('/am/reports/ledgers', ledgers);                    // Ledgers
+router.post('/am/reports/trial-balance', trialBalance);        // Trial Balance Report
+router.post('/am/reports/profit-loss', profitAndLoss);          // Profit and Loss Account
+router.post('/am/reports/balance-sheet', balanceSheet);         // Balance Sheet
+router.post('/am/reports/ledgers', ledgers);                    // Ledgers
 
 module.exports = router;

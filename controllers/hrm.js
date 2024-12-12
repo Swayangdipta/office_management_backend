@@ -636,13 +636,27 @@ exports.generatePayGenerationReport = async (req, res) => {
   try {
     const payBills = await PayBill.aggregate([
       {
+        $lookup: {
+          from: "employees", // The collection name for Employee documents
+          localField: "employee", // The field in PayBill documents referencing the Employee
+          foreignField: "_id", // The field in Employee documents being referenced
+          as: "employee", // The resulting array field in each PayBill document
+        },
+      },
+      {
+        $unwind: {
+          path: "$employeeDetails", // Deconstruct the array to objects
+          preserveNullAndEmptyArrays: true, // Keep records even if there's no match
+        },
+      },
+      {
         $group: {
           _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } }, // Group by date
           records: { $push: "$$ROOT" }, // Collect all matching records
         },
       },
       { $sort: { _id: 1 } }, // Sort by date (ascending)
-    ]);
+    ]);    
 
     if (!payBills || payBills.length === 0) {
       return res.status(404).json({ error: "No pay generation data found." });
@@ -651,6 +665,47 @@ exports.generatePayGenerationReport = async (req, res) => {
     return res.status(200).json({
       success: "Pay generation report grouped by date generated successfully.",
       report: payBills,
+    });
+  } catch (error) {
+    return res.status(500).json({ error: "Internal Server Error", message: error.message });
+  }
+};
+
+// Remittances Posting Report
+exports.generateRemittancesPostingReport = async (req, res) => {
+  try {
+    const remittances = await Remittance.aggregate([
+      {
+        $lookup: {
+          from: "employees", // The collection name for Employee documents
+          localField: "employee", // The field in Remittance documents referencing the Employee
+          foreignField: "_id", // The field in Employee documents being referenced
+          as: "employee", // The resulting array field in each Remittance document
+        },
+      },
+      {
+        $unwind: {
+          path: "$employee", // Deconstruct the array to objects
+          preserveNullAndEmptyArrays: true, // Keep records even if there's no match
+        },
+      },
+      {
+        $group: {
+          _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } }, // Group by date
+          records: { $push: "$$ROOT" }, // Collect all matching records
+        },
+      },
+      { $sort: { _id: 1 } }, // Sort by date (ascending)
+    ]);
+    
+
+    if (!remittances || remittances.length === 0) {
+      return res.status(404).json({ error: "No remittance postings found." });
+    }
+
+    return res.status(200).json({
+      success: "Remittance posting report grouped by date generated successfully.",
+      report: remittances,
     });
   } catch (error) {
     return res.status(500).json({ error: "Internal Server Error", message: error.message });
@@ -683,32 +738,4 @@ exports.generatePayBillPostingReport = async (req, res) => {
     return res.status(500).json({ error: "Internal Server Error", message: error.message });
   }
 };
-
-// Remittances Posting Report
-exports.generateRemittancesPostingReport = async (req, res) => {
-  try {
-    const remittances = await Remittance.aggregate([
-      {
-        $group: {
-          _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } }, // Group by date
-          records: { $push: "$$ROOT" }, // Collect all matching records
-        },
-      },
-      { $sort: { _id: 1 } }, // Sort by date (ascending)
-    ]);
-
-    if (!remittances || remittances.length === 0) {
-      return res.status(404).json({ error: "No remittance postings found." });
-    }
-
-    return res.status(200).json({
-      success: "Remittance posting report grouped by date generated successfully.",
-      report: remittances,
-    });
-  } catch (error) {
-    return res.status(500).json({ error: "Internal Server Error", message: error.message });
-  }
-};
-
-
 // Pay Slip Report

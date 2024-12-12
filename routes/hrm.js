@@ -41,9 +41,9 @@ router.post('/hrm/remittance', hrmController.postRemittance);  // Create new rem
 // router.delete('/hrm/remittance/:remittanceId', isSignedIn, getRemittanceById, hrmController.deleteRemittance);  // Delete remittance by remittanceId
 
 // Report Routes
-router.get('/hrm/reports/employee/:empId', hrmController.generateEmployeeMasterReport);  // Employee Report
-router.get('/hrm/reports/paygeneration/:empId', hrmController.generatePayGenerationReport);  // Pay Generation Report
-router.get('/hrm/reports/:empId', hrmController.generatePayBillPostingReport);  // Pay Bill Posting Report
-router.get('/hrm/reports/remittances/:empId', hrmController.generateRemittancesPostingReport);  // Remittances Report
+router.post('/hrm/reports/employee', hrmController.generateEmployeeMasterReport);  // Employee Report
+router.post('/hrm/reports/paygeneration', hrmController.generatePayGenerationReport);  // Pay Generation Report
+router.post('/hrm/reports/remittances', hrmController.generateRemittancesPostingReport);  // Remittances Report
+router.post('/hrm/reports', hrmController.generatePayBillPostingReport);  // Pay Bill Posting Report
 
 module.exports = router;

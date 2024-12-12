@@ -18,7 +18,9 @@ const {
     getAllStockTypes,
     getStockTypeById,
     generateAssetDetailsReport,
-    generateStockDetailsReport
+    generateStockDetailsReport,
+    generateAssetCategoriesReport,
+    generateStockTypesReport
   } = require('../controllers/sars');
 
 const {
@@ -28,6 +30,12 @@ const {
   getAccountingHeads,
   getAccountingHeadById,
   getAllAccountingHeads,
+  getLastFourVouchers,
+  getLastFourTransactions,
+  trialBalance,
+  profitAndLoss,
+  balanceSheet,
+  ledgers,
 } = require('../controllers/am')
 
 const { isAdministrator, isSignedIn, createEndUsers } = require('../controllers/auth');
@@ -44,6 +52,7 @@ router.param('accountHeadId',getAccountingHeadById)
 router.post('/admin/cr/designation',createDesignation)
 
 const express = require('express');
+const { generateEmployeeMasterReport, generatePayGenerationReport, generatePayBillPostingReport, generateRemittancesPostingReport } = require('../controllers/hrm');
 
 // Designation Routes
 router.get("/admin/degn/:adminId", getDesignations);  // get Asset Category
@@ -101,14 +110,31 @@ router.post('/admin/accounting-head/create/:adminId', isSignedIn, isAdministrato
 router.put('/admin/accounting-head/:accountHeadId/:adminId', isSignedIn, isAdministrator, updateAccountingHead);         // Update
 router.delete('/admin/accounting-head/:accountHeadId/:adminId', isSignedIn, isAdministrator, deleteAccountingHead);     // Delete
 router.post('/admin/accounting-head/:adminId', isSignedIn, isAdministrator, getAllAccountingHeads);           // Get All
+router.post('/admin/voucher/summary/:adminId', isSignedIn, isAdministrator, getLastFourVouchers);           // Get All
+router.post('/admin/transactions/summary/:adminId', isSignedIn, isAdministrator, getLastFourTransactions);           // Get All
 
-router.get("/admin/reports/asset-details/:adminId", generateAssetDetailsReport);  // Asset Details Report
-router.get("/admin/reports/stock-details/:adminId", generateStockDetailsReport); 
  // Stock Details Report
 router.post("/admin/eu/:adminId", getEndUsers);
 router.post("/admin/eu/cr/:adminId", createEndUsers);
 
 router.post("/admin/totals/:adminId", isSignedIn, isAdministrator, getTotals)
+
+router.get("/admin/reports/asset-details", generateAssetDetailsReport);  // Asset Details Report
+router.get("/admin/reports/stock-details", generateStockDetailsReport); 
+router.get("/admin/reports/asset-categories", generateAssetCategoriesReport);  // Asset Categories Report
+// router.get("/admin/reports/asset-details", generateAssetDetailsReport);  // Asset Details Report
+router.get("/admin/reports/stock-types", generateStockTypesReport);  // Stock Types Report
+// router.get("/admin/reports/stock-details", generateStockDetailsReport);  // Stock Details Report
+
+router.get('/admin/reports/trial-balance', trialBalance);        // Trial Balance Report
+router.get('/admin/reports/profit-loss', profitAndLoss);          // Profit and Loss Account
+router.get('/admin/reports/balance-sheet', balanceSheet);         // Balance Sheet
+router.get('/admin/reports/ledgers', ledgers);                    // Ledgers
+
+router.get('/admin/reports/employee/:adminId', generateEmployeeMasterReport);  // Employee Report
+router.get('/admin/reports/paygeneration/:adminId', generatePayGenerationReport);  // Pay Generation Report
+router.get('/admin/reports/paybill/:adminId', generatePayBillPostingReport);  // Pay Bill Posting Report
+router.get('/admin/reports/remittances/:adminId', generateRemittancesPostingReport);  // Remittances Report
 
 
 module.exports = router
