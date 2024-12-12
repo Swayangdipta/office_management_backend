@@ -563,9 +563,9 @@ exports.profitAndLoss = async (req, res) => {
 
     vouchers.forEach((voucher) => {
       voucher.transactions.forEach((transaction) => {
-        if (transaction.type === 'Credit' && voucher.narration.includes('Revenue')) {
+        if (transaction.type === 'Credit' && voucher.narration.toLowerCase().includes('Revenue'.toLowerCase())) {
           revenue += transaction.amount;
-        } else if (transaction.type === 'Debit' && voucher.narration.includes('Expense')) {
+        } else if (transaction.type === 'Debit' && voucher.narration.toLowerCase().includes('Expense'.toLowerCase())) {
           expenses += transaction.amount;
         }
       });
@@ -668,13 +668,13 @@ exports.ledgers = async (req, res) => {
     // Process vouchers
     vouchers.forEach((voucher) => {
       voucher.transactions.forEach((transaction) => {
-        if (transaction.type === 'Credit' && voucher.narration.includes('Revenue')) {
+        if (transaction.type === 'Credit' && voucher.narration.toLowerCase().includes('Revenue'.toLowerCase())) {
           ledgers.revenue.push({
             date: voucher.entryDate,
             description: voucher.narration,
             amount: transaction.amount,
           });
-        } else if (transaction.type === 'Debit' && voucher.narration.includes('Expense')) {
+        } else if (transaction.type === 'Debit' && voucher.narration.toLowerCase().includes('Expense'.toLowerCase())) {
           ledgers.expenses.push({
             date: voucher.entryDate,
             description: voucher.narration,
