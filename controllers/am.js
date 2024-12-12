@@ -318,7 +318,7 @@ exports.getAllVouchers = async (req, res) => {
 exports.getLastFourVouchers = async (req, res) => {
   try {
     const vouchers = await Voucher.find({})
-      .sort({ date: -1 })
+      .sort({ entryDate: -1 })
       .limit(4)
       .populate('payee')
       .populate('transactions.accountHead');
