@@ -22,6 +22,12 @@ const TransactionSchema = new mongoose.Schema(
 
 const VoucherSchema = new mongoose.Schema(
   {
+    voucherId: {
+      type: String
+    },
+    voucherNo: {
+      type: String
+    },
     entryDate: {
       type: Date,
       required: true,

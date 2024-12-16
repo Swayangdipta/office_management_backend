@@ -236,7 +236,19 @@ exports.getAllParties = async (req, res) => {
 // Create a new voucher
 exports.createVoucher = async (req, res) => {
   try {
-    const voucher = new Voucher(req.body);
+    const datee = new Date();
+
+    // Shortened Voucher No
+    const pad = (num) => String(num).padStart(2, '0');
+    const voucherNo = `CP${datee.getFullYear().toString().slice(-2)}${pad(datee.getMonth() + 1)}${pad(datee.getDate())}${datee.getMilliseconds()}`;
+
+    const voucherId = `V-${Date.now()}`;
+    const voucher = new Voucher({ ...req.body, voucherId, voucherNo });
+
+    // Validate transactions
+    if (!Array.isArray(voucher.transactions)) {
+      return res.status(400).json({ error: 'Transactions must be an array' });
+    }
 
     // Calculate debit and credit totals
     const debitTotal = voucher.transactions
@@ -253,10 +265,12 @@ exports.createVoucher = async (req, res) => {
       return res.status(400).json({ error: 'Debit and Credit amounts must balance before saving.' });
     }
 
+    // Save voucher
     const savedVoucher = await voucher.save();
     res.status(201).json({ success: true, data: savedVoucher });
   } catch (error) {
-    res.status(400).json({ success: false, data: 'Failed to create voucher', error });
+    console.error('Error creating voucher:', error); // Log error for debugging
+    res.status(500).json({ success: false, message: 'Error creating voucher', error: error.message });
   }
 };
 
