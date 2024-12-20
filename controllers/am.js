@@ -373,9 +373,14 @@ exports.createBankTransaction = async (req, res) => {
 exports.generateBankStatement = async (req, res) => {
   try {
     const transactions = await BankTransaction.find({})
-      .populate('voucher', 'narration voucherType')
+      .populate({
+        path: 'voucher',
+        select: 'narration voucherType voucherId'
+      })
       .sort({ date: 1 });
 
+    console.log(transactions);
+    
     res.status(200).json({ success: true, data: transactions });
   } catch (error) {
     res.status(500).json({ success: false, data: 'Failed to fetch bank statements', error });
