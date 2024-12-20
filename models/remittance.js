@@ -29,6 +29,14 @@ const remittanceSchema = new mongoose.Schema(
       enum: ["Pending", "Completed"],
       default: "Pending",
     },
+    bank: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Bank'
+    },
+    signatory: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'AccountHead'
+    }
   },
   { timestamps: true }
 );

@@ -27,6 +27,10 @@ const payBillSchema = new mongoose.Schema(
       type: Number,
       required: true,
     },
+    other_deductions: {
+      type: Number,
+      required: true,
+    },
     gross_pay: {
       type: Number,
       required: true,
@@ -46,7 +50,20 @@ const payBillSchema = new mongoose.Schema(
     status: {
       type: String,
       enum: ["Pending", "Posted"],
-      default: "Pending",
+      default: "Posted",
+    },
+    bank: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Bank",
+    },
+    voucher_date: {
+      type: Date,
+      required: true,
+    },
+    signatory: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "AccountHead",
+      required: true,
     },
   },
   { timestamps: true }

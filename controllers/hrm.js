@@ -2,7 +2,8 @@ const Employee = require("../models/employee");
 const PayGeneration = require("../models/payGeneration");
 const PayBill = require("../models/payBill");
 const Remittance = require("../models/remittance");
-const _ = require('lodash')
+const _ = require('lodash');
+const Bank = require("../models/Bank");
 
 
 exports.getEmployeeById = async (req,res,next,id) => {
@@ -55,7 +56,7 @@ exports.getRemittanceById = async (req, res, next, remittanceId) => {
 
 exports.createEmployee = async (req,res,next) => {
     try {
-        const {fullname, date_of_birth, cid, emp_id, tpn_acc_num, has_gis, gis_acc_num, has_pf, pf_acc_num, sav_acc_num, bank_name, bank_branch, benefits, deductions, qualifications} = req.body
+        const {fullname, emp_type,  date_of_birth, cid, emp_id, tpn_acc_num, has_gis, gis_acc_num, has_pf, pf_acc_num, sav_acc_num, bank_name, bank_branch, benefits, deductions, qualifications} = req.body
         
         if (
             !fullname ||
@@ -75,6 +76,7 @@ exports.createEmployee = async (req,res,next) => {
         }
 
         const employee = new Employee(req.body)
+        employee.designation = req.designation._id
 
         const savedEmployee = await employee.save()
 
@@ -82,7 +84,7 @@ exports.createEmployee = async (req,res,next) => {
             return res.status(400).json({error: 'Failed to create employee!', message: savedEmployee})
         }
 
-        req.savedEmployee = {success: 'Employee created successfully!', message: savedEmployee}
+        req.savedEmployee = savedEmployee
 
         next()
     } catch (error) {
@@ -110,20 +112,39 @@ exports.updateEmployee = async (req, res) => {
     }
 }
 
+exports.updateEmployeeActiveStatus = async (req,res) => {
+  try {
+    const employee = req.employee
+    employee.is_active = !employee.is_active
+    const updatedEmployee = await employee.save()
+
+    if(!updatedEmployee || updatedEmployee.errors){
+      return res.status(400).json({error: 'Failed to update employee active status!', message: updatedEmployee})
+    }
+
+    return res.status(200).json({success: 'Employee active status updated successfully!', message: updatedEmployee})
+  } catch (error) {
+    return res.status(500).json({error: 'Internal Server Error!', message: error})
+  }
+}
+
 exports.deleteEmployee = async (req, res,next) => {
     try {
         const employee = req.employee
 
-        const deletedEmployee = await employee.remove()
+        const deletedEmployee = await employee.deleteOne()
 
         if(!deletedEmployee || deletedEmployee.errors){
             return res.status(400).json({error: 'Failed to delete employee!', message: deletedEmployee})
         }
 
-        req.deletedEmployee = 'Employee deleted successfully!'
+        console.log(employee);
+        
+
+        req.deletedEmployee = employee
 
         next()
-    } catch (error) {
+    } catch (error) {      
         return res.status(500).json({error: 'Internal Server Error!', message: error})
     }
 }
@@ -139,10 +160,10 @@ exports.getEmployees = async (req, res) => {
     const offset = (pageNumber - 1) * limit;
 
     // Fetch employees with pagination
-    const employees = await Employee.find()
+    const employees = await Employee.find().populate('designation', 'title')
       // .skip(offset)
       // .limit(limit)
-      .select("_id fullname emp_id date_of_birth")
+      .select("_id fullname emp_id cid benefits designation emp_type is_active")
       .exec();
 
     // Total record count for metadata
@@ -210,10 +231,11 @@ exports.generatePay = async (req, res) => {
     const tds = employee.deductions.tds;
     const pf = employee.deductions.pf;
     const gis = employee.deductions.gis;
+    const other_deductions = employee.deductions.other_deductions;
 
     // Calculate gross and net pay
     const gross_pay = basic_pay + allowances;
-    const total_deductions = tds + pf + gis;
+    const total_deductions = tds + pf + gis + other_deductions;
     const net_pay = gross_pay - total_deductions;
 
     // Create the Pay Generation document
@@ -224,6 +246,7 @@ exports.generatePay = async (req, res) => {
       tds,
       pf,
       gis,
+      other_deductions,
       gross_pay,
       net_pay,
       pay_date,
@@ -285,68 +308,244 @@ exports.getPayByEmployee = async (req, res) => {
 }
 
 // Pay Bill Posting
-exports.postPayBill = async (req, res) => {
+exports.postPayBillForMonth = async (req, res) => {
   try {
-    const { _id, pay_date } = req.body;
+    const { month, bankOrCash, bank, voucher_date, signatory } = req.body;
 
-    if (!_id || !pay_date) {
+    // Validate inputs
+    if (!month || !bankOrCash || !voucher_date || !signatory) {
       return res.status(400).json({
-        error: "Employee ID and Pay Date are required",
-        message: "Bad Request",
+        error: "Month, Bank or Cash, Voucher Date, and Signatory are required.",
       });
     }
 
-    // Fetch the generated pay details for the given employee and pay date
-    const payGeneration = await PayGeneration.findOne({
-      employee: _id,
-      pay_date,
+    if (bankOrCash === "Bank" && !bank) {
+      return res.status(400).json({
+        error: "Bank ID is required when Bank is selected.",
+      });
+    }
+
+    // Prepare date range for the selected month
+    const startDate = new Date(`${month}-01`);
+    const endDate = new Date(`${month}-31`);
+
+    // Fetch eligible pay generation records
+    const payGenerations = await PayGeneration.find({
+      pay_date: { $gte: startDate, $lt: endDate },
+      status: { $ne: "Posted" }, // Exclude already posted records
     });
 
-    if (!payGeneration) {
+    if (!payGenerations.length) {
       return res.status(404).json({
-        error: "No pay generation record found for this employee on the given date",
+        error: "No pay generation records found for the selected month.",
       });
     }
 
-    // Create a new Pay Bill entry from the pay generation record
-    const payBill = new PayBill({
-      employee: payGeneration.employee,
-      basic_pay: payGeneration.basic_pay,
-      allowances: payGeneration.allowances,
-      tds: payGeneration.tds,
-      pf: payGeneration.pf,
-      gis: payGeneration.gis,
-      gross_pay: payGeneration.gross_pay,
-      net_pay: payGeneration.net_pay,
-      pay_date: payGeneration.pay_date,
-      status: 'Posted'
+    // Map pay generation records to pay bill documents
+    const payBills = payGenerations.map((payGen) => {
+      const basic_pay = parseFloat(payGen.basic_pay || 0);
+      const allowances = parseFloat(payGen.allowances || 0);
+      const tds = parseFloat(payGen.tds || 0);
+      const pf = parseFloat(payGen.pf || 0);
+      const gis = parseFloat(payGen.gis || 0);
+      const other_deductions = parseFloat(payGen.other_deductions || 0);
+
+      const gross_pay = parseFloat(basic_pay + allowances);
+      const total_deductions = parseFloat(tds + pf + gis + other_deductions);
+      const net_pay = parseFloat(Math.max(0, gross_pay - total_deductions)); // Ensure net pay is never negative
+
+      return {
+        employee: payGen.employee,
+        basic_pay,
+        allowances,
+        tds,
+        pf,
+        gis,
+        other_deductions,
+        gross_pay,
+        net_pay,
+        pay_date: payGen.pay_date,
+        status: "Posted",
+        bank: bankOrCash === "Bank" ? bank : null,
+        voucher_date,
+        signatory,
+      };
     });
 
-    // Save the Pay Bill record
-    const savedPayBill = await payBill.save();
+    // Insert pay bills into the database
+    await PayBill.insertMany(payBills);
 
-    if (!savedPayBill) {
-      return res.status(400).json({
-        error: "Failed to post pay bill!",
-        message: savedPayBill.errors,
-      });
-    }
-
-    // Update the status of the pay generation record to "Posted"
-    payGeneration.status = "Posted";
-    await payGeneration.save();
+    // Update the status of pay generation records
+    await PayGeneration.updateMany(
+      {
+        pay_date: { $gte: startDate, $lt: endDate },
+        status: { $ne: "Posted" },
+      },
+      { $set: { status: "Posted" } }
+    );
 
     return res.status(200).json({
-      success: "Pay bill posted successfully!",
-      message: savedPayBill,
+      success: "Pay bills posted successfully.",
+      count: payBills.length,
     });
   } catch (error) {
+    console.error(error);
     return res.status(500).json({
-      error: "Internal Server Error!",
+      error: "Internal Server Error",
       message: error.message,
     });
   }
 };
+
+exports.getPayBillPreview = async (req, res) => {
+  try {
+    const { month, bankOrCash, bank, voucher_date, signatory } = req.body;
+    
+    // Validate inputs
+    if (!month || !bankOrCash || !voucher_date || !signatory) {
+      return res.status(400).json({
+        error: "Month, Bank or Cash, Voucher Date, and Signatory are required.",
+      });
+    }
+
+    // Validate bank selection if bankOrCash is "Bank"
+    if (bankOrCash === "Bank" && !bank) {
+      return res.status(400).json({
+        error: "Bank ID is required when Bank is selected.",
+      });
+    }
+
+    // Prepare date range for the selected month
+    const startDate = new Date(`${month}-01`);
+    const endDate = new Date(startDate);
+    endDate.setMonth(endDate.getMonth() + 1); // Advance one month
+    endDate.setDate(0); // Set to the last day of the month
+
+    console.log("Start Date:", startDate);
+    console.log("End Date:", endDate);
+
+    // Fetch eligible pay generation records for the specified month
+    const payGenerations = await PayGeneration.find({
+      pay_date: { $gte: startDate, $lte: endDate }, // Ensure it captures the entire month
+      status: { $ne: "Posted" }, // Exclude already posted records
+    }).populate("employee", "fullname");
+
+    console.log("Query Results:", payGenerations);
+
+    if (!payGenerations.length) {
+      return res.status(404).json({
+        error: "No pay generation records found for the selected month.",
+      });
+    }
+
+    // Calculate totals
+    const totals = payGenerations.reduce(
+      (acc, payGen) => {
+        acc.totalGrossPay += parseFloat(payGen.gross_pay || 0);
+        acc.totalRecoveries += parseFloat(
+          (payGen.tds || 0) +
+          (payGen.pf || 0) +
+          (payGen.gis || 0) +
+          (payGen.other_deductions || 0)
+        );
+        acc.totalNetPayment += parseFloat(payGen.net_pay || 0);
+        return acc;
+      },
+      { totalGrossPay: 0, totalRecoveries: 0, totalNetPayment: 0 }
+    );
+
+    // Return the preview data
+    return res.status(200).json({
+      success: "Preview fetched successfully.",
+      totals,
+      payDetails: payGenerations.map((payGen) => ({
+        employeeName: payGen.employee.fullname,
+        grossPay: payGen.gross_pay,
+        totalDeductions:
+          parseFloat(payGen.tds || 0) +
+          parseFloat(payGen.pf || 0) +
+          parseFloat(payGen.gis || 0) +
+          parseFloat(payGen.other_deductions || 0),
+        netPay: payGen.net_pay,
+      })),
+      details: {
+        bankOrCash,
+        bank,
+        voucher_date,
+        signatory,
+      },
+    });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({
+      error: "Internal Server Error",
+      message: error.message,
+    });
+  }
+};
+
+exports.undoPostPayBill = async (req, res) => {
+  try {
+    const { month, bankOrCash, bank, voucher_date, signatory } = req.body;
+
+    // Validate inputs
+    if (!month || !bankOrCash || !voucher_date || !signatory) {
+      return res.status(400).json({
+        error: "Month, Bank or Cash, Voucher Date, and Signatory are required.",
+      });
+    }
+
+    if (bankOrCash === "Bank" && !bank) {
+      return res.status(400).json({
+        error: "Bank ID is required when Bank is selected.",
+      });
+    }
+
+    // Prepare date range for the selected month
+    const startDate = new Date(`${month}-01`);
+    const endDate = new Date(`${month}-31`);
+
+    // Fetch pay bills created during the postPayBill process
+    const payBills = await PayBill.find({
+      pay_date: { $gte: startDate, $lt: endDate },
+      status: "Posted"
+    });
+
+    if (!payBills.length) {
+      return res.status(404).json({
+        error: "No pay bills found for the selected month to undo.",
+      });
+    }
+
+    // Extract employee IDs for the update
+    const employeeIds = payBills.map(payBill => payBill.employee);
+
+    // Remove the pay bills from the database
+    await PayBill.deleteMany({ _id: { $in: payBills.map(payBill => payBill._id) } });
+
+    // Update the status of pay generation records to "Not Posted"
+    await PayGeneration.updateMany(
+      {
+        employee: { $in: employeeIds },
+        pay_date: { $gte: startDate, $lt: endDate }
+      },
+      { $set: { status: "Not Posted" } }
+    );
+
+    return res.status(200).json({
+      success: "Pay bills undone successfully.",
+      count: payBills.length,
+    });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({
+      error: "Internal Server Error",
+      message: error.message,
+    });
+  }
+};
+
+
 
 // Remittances posting
 
@@ -396,6 +595,8 @@ exports.postRemittance = async (req, res) => {
         case "GIS":
           amount = bill.gis;
           break;
+        case 'OTHER': 
+          amount = bill.other_deductions;
         default:
           amount = 0;
       }
@@ -450,6 +651,180 @@ exports.postRemittance = async (req, res) => {
   }
 };
 
+exports.processRemittance = async (req, res) => {
+  try {
+    const { month, signatory, category, remittanceTo, bank, date } = req.body;
+
+    if (!month || !signatory || !category || !remittanceTo || !bank || !date) {
+      return res.status(400).json({ error: "All fields are required." });
+    }
+
+    // Prepare date range for the selected month
+    const startDate = new Date(`${month}-01`);
+    const endDate = new Date(startDate);
+    endDate.setMonth(endDate.getMonth() + 1);
+    endDate.setDate(0);
+
+    // Fetch pay bills for the given month
+    const payBills = await PayBill.find({
+      pay_date: { $gte: startDate, $lte: endDate },
+      status: "Posted",
+    });
+
+    if (!payBills.length) {
+      return res.status(404).json({
+        error: `No posted pay bills found for the selected month: ${month}.`,
+      });
+    }
+
+    // Calculate remittance details
+    let totalDrAmount = 0;
+    const details = payBills.map((bill) => {
+      let amount = 0;
+      switch (category) {
+        case "TDS":
+          amount = bill.tds || 0;
+          break;
+        case "PF":
+          amount = bill.pf || 0;
+          break;
+        case "GIS":
+          amount = bill.gis || 0;
+          break;
+        case "Other":
+          amount = bill.other_deductions || 0;
+          break;
+      }
+
+      totalDrAmount += amount;
+
+      return {
+        bh: bill.bh || "N/A",
+        obc: bill.obc || "N/A",
+        budgetLine: bill.budgetLine || "N/A",
+        drAmount: amount,
+        crAmount: 0,
+      };
+    });
+
+    res.status(200).json({
+      details,
+      totalDrAmount,
+      message: `Processed remittance data successfully for the month: ${month}.`,
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Failed to process remittance data", message: error.message });
+  }
+};
+
+exports.saveRemittance = async (req,res) => {
+  try {
+    const { month, signatory, category, remittanceTo, bank, date } = req.body;
+
+    if (!month || !signatory || !category || !remittanceTo || !bank || !date) {
+      return res.status(400).json({ error: "All fields are required." });
+    }
+
+    // Prepare date range for the selected month
+    const startDate = new Date(`${month}-01`);
+    const endDate = new Date(startDate);
+    endDate.setMonth(endDate.getMonth() + 1);
+    endDate.setDate(0);
+
+    // Fetch posted pay bills for the given month
+    const payBills = await PayBill.find({
+      pay_date: { $gte: startDate, $lte: endDate },
+      status: "Posted",
+    });
+
+    if (!payBills.length) {
+      return res.status(404).json({
+        error: `No posted pay bills found for the selected month: ${month}.`,
+      });
+    }
+
+    const remittances = payBills.map((bill) => {
+      let amount = 0;
+      switch (category) {
+        case "TDS":
+          amount = bill.tds || 0;
+          break;
+        case "PF":
+          amount = bill.pf || 0;
+          break;
+        case "GIS":
+          amount = bill.gis || 0;
+          break;
+        case "Other":
+          amount = bill.other_deductions || 0;
+          break;
+      }
+
+      return {
+        month,
+        signatory,
+        remittance_type: category,
+        employee: bill.employee._id,
+        amount,
+        remittance_date: bill.pay_date,
+        posting_date: date,
+        bank: bank ? (bill.bank ? bill.bank._id : null) : null,
+        bh: bill.bh || "N/A",
+        obc: bill.obc || "N/A",
+        budgetLine: bill.budgetLine || "N/A",
+        drAmount: amount,
+        crAmount: 0,
+      };
+    });
+
+    await Remittance.insertMany(remittances);
+
+    res.status(200).json({
+      success: `Remittance data saved successfully for the month: ${month}.`,
+      count: remittances.length,
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Failed to save remittance data", message: error.message });
+  }
+}
+
+exports.undoRemittance = async (req,res) => {
+  try {
+    const { month, category } = req.body;
+
+    if (!month || !category) {
+      return res.status(400).json({ error: "Month and category are required." });
+    }
+
+    // Prepare date range for the selected month
+    const startDate = new Date(`${month}-01`);
+    const endDate = new Date(startDate);
+    endDate.setMonth(endDate.getMonth() + 1);
+    endDate.setDate(0);
+
+    // Delete remittance records for the given month and category
+    const deletedRecords = await Remittance.deleteMany({
+      remittance_date: { $gte: startDate, $lte: endDate },
+      category,
+    });
+
+    if (!deletedRecords.deletedCount) {
+      return res.status(404).json({
+        error: `No remittance records found for the month: ${month} and category: ${category}.`,
+      });
+    }
+
+    res.status(200).json({
+      success: `Remittance records undone successfully for the month: ${month}.`,
+      deletedCount: deletedRecords.deletedCount,
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Failed to undo remittance posting", message: error.message });
+  }
+}
 
 // Pay slip
 
@@ -568,7 +943,7 @@ exports.generateLPC = async (req, res) => {
 
     // Calculate benefits, deductions, and net salary for LPC
     const totalBenefits = (payBill.basic_pay || 0) + (payBill.allowances || 0);
-    const totalDeductions = (payBill.tds || 0) + (payBill.pf || 0) + (payBill.gis || 0);
+    const totalDeductions = (payBill.tds || 0) + (payBill.pf || 0) + (payBill.gis || 0) + (payBill.other_deductions || 0);
     const netSalary = totalBenefits - totalDeductions;
 
     // Construct the LPC document
@@ -738,4 +1113,174 @@ exports.generatePayBillPostingReport = async (req, res) => {
     return res.status(500).json({ error: "Internal Server Error", message: error.message });
   }
 };
-// Pay Slip Report
+// Add-on's
+
+exports.getPayPreview = async (req, res) => {
+  try {
+    const { month } = req.body; // Month format: YYYY-MM
+
+    if (!month) {
+      return res.status(400).json({
+        error: "Please select a month!",
+        message: "Bad Request",
+      });
+    }
+
+    // Check if pay has already been finalized for the month
+    const existingPays = await PayGeneration.find({
+      pay_date: { 
+        $gte: new Date(`${month}-01`),
+        $lt: new Date(`${month}-31`)
+      },
+    });
+
+    const isFinalized = existingPays.length > 0;
+
+    // Fetch all active employees
+    const activeEmployees = await Employee.find({ is_active: true });
+
+    if (activeEmployees.length === 0) {
+      return res.status(404).json({
+        error: "No active employees found.",
+      });
+    }
+
+    // Calculate pay details for preview
+    const previewData = activeEmployees.map((employee) => {
+      const { basic_pay, allowances } = employee.benefits;
+      const { tds, pf, gis, other_deductions } = employee.deductions;
+
+      const gross_pay = parseFloat(basic_pay) + parseFloat(allowances);
+      const total_deductions = parseFloat(tds) + parseFloat(pf) + parseFloat(gis) + parseFloat(other_deductions);
+      const net_pay = gross_pay - total_deductions;
+
+      return {
+        emp_id: employee.emp_id,
+        name: employee.fullname,
+        cid: employee.cid,
+        basic_pay,
+        allowances,
+        tds,
+        pf,
+        gis,
+        other_deductions,
+        total_deductions,
+        gross_pay,
+        net_pay,
+        status: isFinalized ? "Finalized" : "Pending",
+      };
+    });
+
+    return res.status(200).json({
+      success: "Preview fetched successfully.",
+      isFinalized,
+      employees: previewData,
+    });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({
+      error: "Internal Server Error",
+      message: error.message,
+    });
+  }
+};
+
+exports.finalizePayForMonth = async (req, res) => {
+  try {
+    const { month, action } = req.body; // action: "finalize" or "unfinalize"
+
+    if (!month || !action) {
+      return res.status(400).json({
+        error: "Month and action (finalize/unfinalize) are required.",
+      });
+    }
+
+    if (action === "finalize") {
+      // Check if already finalized
+      const existingPays = await PayGeneration.find({
+        pay_date: {
+          $gte: new Date(`${month}-01`),
+          $lt: new Date(`${month}-31`),
+        },
+      });
+
+      if (existingPays.length > 0) {
+        return res.status(400).json({
+          error: "Pay already finalized for this month.",
+        });
+      }
+
+      // Fetch active employees
+      const activeEmployees = await Employee.find({ is_active: true });
+
+      const payDocuments = activeEmployees.map((employee) => {
+        const basic_pay = parseFloat(employee.benefits.basic_pay || 0);
+        const allowances = parseFloat(employee.benefits.allowances || 0);
+        const tds = parseFloat(employee.deductions.tds || 0);
+        const pf = parseFloat(employee.deductions.pf || 0);
+        const gis = parseFloat(employee.deductions.gis || 0);
+        const other_deductions = parseFloat(employee.deductions.other_deductions || 0);
+
+        const gross_pay = basic_pay + allowances;
+        const total_deductions = tds + pf + gis + other_deductions;
+        const net_pay = Math.max(0, gross_pay - total_deductions); // Ensure net_pay is never negative
+
+        return {
+          employee: employee._id,
+          basic_pay,
+          allowances,
+          tds,
+          pf,
+          gis,
+          other_deductions,
+          gross_pay,
+          net_pay,
+          pay_date: new Date(`${month}-01`),
+          status: "Pending",
+        };
+      });
+
+      await PayGeneration.insertMany(payDocuments);
+
+      return res.status(200).json({
+        success: "Pay finalized successfully.",
+      });
+    } else if (action === "unfinalize") {
+      // Delete pay for the given month
+      await PayGeneration.deleteMany({
+        pay_date: {
+          $gte: new Date(`${month}-01`),
+          $lt: new Date(`${month}-31`),
+        },
+      });
+
+      return res.status(200).json({
+        success: "Pay unfinalized successfully.",
+      });
+    } else {
+      return res.status(400).json({ error: "Invalid action specified." });
+    }
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({
+      error: "Internal Server Error",
+      message: error.message,
+    });
+  }
+};
+
+exports.getBanks = async (req,res) => {
+  try {
+    const banks = await Bank.find()
+
+    if(!banks || banks.length === 0) {
+      return res.status(404).json({ error: "No banks found." });
+      }
+    return res.status(200).json(banks);
+  } catch (error) {
+    return res.status(500).json({
+      error: "Internal Server Error",
+      message: error.message,
+    });
+  }
+}

@@ -16,13 +16,24 @@ const employeeSchema = new mongoose.Schema({
     sav_acc_num: String,
     bank_name: String,
     bank_branch: String,
+    designation: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Designations'
+    },
+    emp_type: {
+        type: String
+    },
     benefits: {
         type: Object
     },
     deductions: {
         type: Object
     },
-    qualifications: []
+    qualifications: [],
+    is_active: {
+        type: Boolean,
+        default: true
+    }
 },{timestamps: true})
 
 module.exports = mongoose.model('Employee',employeeSchema)

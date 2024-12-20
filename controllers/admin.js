@@ -160,40 +160,59 @@ exports.removeDesignation = async (req,res) => {
     }   
 }
 
-exports.pushIntoDesignation = async (req,res) => {
+exports.pushIntoDesignation = async (req, res) => {
     try {
-        const designation = req.designation
-
-
-        const updatedDesignation = await designation.updateOne({$push: {employees: req.savedEmployee._id}})
-
-        if(!updatedDesignation || updatedDesignation.errors ){
-            return res.status(400).json({error: 'Failed to push employee into designation!', message: updatedDesignation})
+      if (!req.savedEmployee || !req.savedEmployee._id) {
+        return res.status(400).json({ error: 'Invalid employee data provided.' });
+      }
+  
+      const designation = req.designation; // Assume middleware populates this
+      const updatedDesignation = await Designations.findByIdAndUpdate(
+        designation._id,
+        { $push: { employees: req.savedEmployee._id } },
+        { new: true }
+      );
+  
+      if (!updatedDesignation) {
+        return res.status(400).json({ error: 'Failed to push employee into designation!' });
+      }
+  
+      return res.status(200).json({
+        success: 'Employee pushed into designation successfully!',
+        designation: updatedDesignation,
+      });
+    } catch (error) {
+      return res.status(500).json({ error: 'Internal Server Error!', message: error.message });
+    }
+};
+  
+exports.popFromDesignation = async (req, res) => {
+    try {
+        if (!req.deletedEmployee || !req.deletedEmployee._id) {
+        return res.status(400).json({ error: 'Invalid employee ID provided.' });
         }
 
-        return res.status(200).json({success: 'Employee pushed into designation successfully!', message: updatedDesignation})
-    } catch (error) {
-        return res.status(500).json({error: 'Internal Server Error!', message: error})
-    }
-}
-
-exports.popFromDesignation = async (req,res) => {
-    try {
-        const designation = await Designations.findOne({ employees: employeeId });
+        const designation = await Designations.findOne({ employees: req.deletedEmployee._id });
 
         if (!designation) {
-            return res.status(400).json({error: 'No designation found for the given employee ID', message: designation})
+        return res.status(400).json({ error: 'No designation found for the given employee ID' });
         }
 
-        const updatedDesignation = await designation.updateOne({$pull: {employees: req.savedEmployee._id}})
+        const updatedDesignation = await Designations.findByIdAndUpdate(
+        designation._id,
+        { $pull: { employees: req.deletedEmployee._id } },
+        { new: true }
+        );
 
-        if(!updatedDesignation || updatedDesignation.errors ){
-            return res.status(400).json({error: 'Failed to pop employee from designation!', message: updatedDesignation})
+        if (!updatedDesignation) {
+        return res.status(400).json({ error: 'Failed to pop employee from designation!' });
         }
-        
 
-        return res.status(200).json({success: req.deletedEmployee, message: updatedDesignation})
+        return res.status(200).json({
+        success: 'Employee removed from designation successfully!',
+        designation: updatedDesignation,
+        });
     } catch (error) {
-        return res.status(500).json({error: 'Internal Server Error!', message: error})
+        return res.status(500).json({ error: 'Internal Server Error!', message: error.message });
     }
-}
+};
