@@ -1,4 +1,4 @@
-const { getAdminById, createDesignation, getDesignationById, updateDesignation, removeDesignation, getDesignations, getEndUsers, getTotals } = require('../controllers/admin')
+const { getAdminById, createDesignation, getDesignationById, updateDesignation, removeDesignation, getDesignations, getEndUsers, getTotals, createApprovingAuthority, removeApprovingAuthority, getApprovingAuthorityById } = require('../controllers/admin')
 const {
     createAssetCategory,
     updateAssetCategory,
@@ -48,6 +48,7 @@ router.param('typeId',getAssetTypeById)
 router.param('stockId',getStockTypeById)
 router.param('degnId',getDesignationById)
 router.param('accountHeadId',getAccountingHeadById)
+router.param('approvingAuthority',getApprovingAuthorityById)
 
 router.post('/admin/cr/designation',createDesignation)
 
@@ -136,6 +137,9 @@ router.get('/admin/reports/employee/:adminId', generateEmployeeMasterReport);  /
 router.get('/admin/reports/paygeneration/:adminId', generatePayGenerationReport);  // Pay Generation Report
 router.get('/admin/reports/paybill/:adminId', generatePayBillPostingReport);  // Pay Bill Posting Report
 router.get('/admin/reports/remittances/:adminId', generateRemittancesPostingReport);  // Remittances Report
+
+router.post('/admin/approving-authority', createApprovingAuthority);  // Remittances Report
+router.delete('/admin/approving-authority/:approvingAuthority', removeApprovingAuthority);  // Remittances Report
 
 
 module.exports = router

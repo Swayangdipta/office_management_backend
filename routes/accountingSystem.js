@@ -27,8 +27,10 @@ const {
   trialBalance,
   profitAndLoss,
   balanceSheet,
-  ledgers
+  ledgers,
+  getAllAccountingHeadSub
 } = require('../controllers/am');
+const { getApprovingAuthorities } = require('../controllers/admin');
 
 router.param('partyId',getPartyById)
 router.param('voucherId',getVoucherById)
@@ -47,6 +49,7 @@ router.put('/am/voucher/:voucherId', updateVoucher);               // Update Vou
 router.post('/am/voucher/v/:voucherId', getVoucher);                  // Get Voucher
 router.post('/am/voucher', getAllVouchers);                  // Get Voucher
 router.post('/am/voucher/ah', getAllAccountingHeads);                  // Get Voucher
+router.post('/am/voucher/ahs', getAllAccountingHeadSub);                  // Get Voucher
 
 // Transaction Entry (End User)
 // router.post('/am/voucher/transaction', createTransaction);   // Add Transaction
@@ -65,5 +68,7 @@ router.post('/am/reports/trial-balance', trialBalance);        // Trial Balance 
 router.post('/am/reports/profit-loss', profitAndLoss);          // Profit and Loss Account
 router.post('/am/reports/balance-sheet', balanceSheet);         // Balance Sheet
 router.post('/am/reports/ledgers', ledgers);                    // Ledgers
+
+router.post('/am/approving-authorities', getApprovingAuthorities); // Get Approving Authorities
 
 module.exports = router;

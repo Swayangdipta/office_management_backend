@@ -7,6 +7,7 @@ const AssetDetail = require('../models/assetDetails');
 const StockDetail = require('../models/stockDetails');
 const Voucher = require('../models/voucher');
 const BankTransaction = require('../models/bankTransaction');
+const ApprovingAuthority = require("../models/approvingAuthority");
 
 exports.getTotals =  async (req, res) => {
   try {
@@ -70,6 +71,20 @@ exports.getDesignationById = async (req,res,next,id) => {
             return res.status(404).json({error: 'Account not found!', message: designation})
         }
         req.designation = designation
+        next()
+    } catch (error) {
+
+        return res.status(500).json({error: 'Internal Server Error!', message: error})
+    }
+}
+
+exports.getApprovingAuthorityById = async (req,res,next,id) => {
+    try {
+        const approvingAuthority = await ApprovingAuthority.findById(id)
+        if(!approvingAuthority || approvingAuthority.errors){
+            return res.status(404).json({error: 'Authority not found!', message: approvingAuthority})
+        }
+        req.approvingAuthority = approvingAuthority
         next()
     } catch (error) {
 
@@ -214,5 +229,50 @@ exports.popFromDesignation = async (req, res) => {
         });
     } catch (error) {
         return res.status(500).json({ error: 'Internal Server Error!', message: error.message });
+    }
+};
+
+exports.createApprovingAuthority = async (req,res) => {
+    try {
+        const {name, cid, email} = req.body
+        if(!name || !cid || !email){
+            return res.status(400).json({error: 'Please provide the mandatory data.', message: {name,cid,email}})
+        }
+
+        const approvingAuthority = await ApprovingAuthority.create(req.body)
+
+        if(!approvingAuthority || approvingAuthority.errors ){
+            return res.status(400).json({error: 'Failed to create approving authority!', data: approvingAuthority.errors})
+        }
+
+        return res.status(200).json({success: 'Approving Authority created successfully!', data: approvingAuthority })
+    } catch (error) {
+        return res.status(500).json({error: 'Internal Server Error!', data: error})
+    }
+}
+
+exports.getApprovingAuthorities = async (req,res) => {
+    try {
+        const authorities = await ApprovingAuthority.find()
+        
+        if(!authorities || authorities.errors ){
+            return res.status(404).json({error: 'No authorities found!'})
+        }
+        return res.status(200).json({success: 'Approving Authorities found successfully!', data: authorities})
+    } catch (error) {
+        return res.status(500).json({error: 'Internal Server Error!', message: error})
+    }
+}
+
+exports.removeApprovingAuthority = async (req, res) => {
+    try {
+      const approvingAuthority = req.approvingAuthority;
+  
+      // Delete the approving authority
+      await approvingAuthority.deleteOne();
+  
+      return res.status(200).json({ success: 'Approving authority removed successfully!', data: approvingAuthority });
+    } catch (error) {
+      return res.status(500).json({ error: 'Internal Server Error!', message: error.message });
     }
 };

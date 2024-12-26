@@ -54,6 +54,11 @@ const VoucherSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    approvingAuthority: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'ApprovingAuthority',
+      required: true,
+    },
   },
   { timestamps: true }
 );

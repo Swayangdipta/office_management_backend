@@ -58,13 +58,14 @@ exports.getAccountingHeads = async (req, res) => {
 
 // Create a new accounting head
 exports.createAccountingHead = async (req, res) => {
-  const { name, type, parent, asset, description, assets, stocks } = req.body;
+  const { name, type, parent, asset, description, assets, stocks, code } = req.body;
 
   try {
     // Create a new accounting head
     const newHead = new AccountingHead({
       name,
       type,
+      code,
       parent: parent || null,
       asset: asset || false,
       description,
@@ -155,7 +156,34 @@ exports.deleteAccountingHead = async (req, res) => {
 exports.getAllAccountingHeads = async (req, res) => {
   try {
     // Fetch all Accounting Heads
-    const accountingHeads = await AccountingHead.find()
+    
+    const accountingHeads = await AccountingHead.find({type: req.body.type})
+      .populate("parent") // For hierarchical structure
+      .populate("assets") // Include linked assets
+      .populate("stocks"); // Include linked stocks
+
+    // Fetch asset and stock details from SARS
+    const assetDetails = await AssetDetails.find().select("registrationId assetType purchaseValue");
+    const stockDetails = await StockDetails.find().select("registrationId stockType purchaseValue");
+
+    return res.status(200).json({
+      success: "Accounting Heads fetched successfully",
+      data: {
+        accountingHeads,
+        assetsFromSARS: assetDetails,
+        stocksFromSARS: stockDetails,
+      },
+    });
+  } catch (error) {
+    return res.status(500).json({ error: "Internal Server Error", message: error.message });
+  }
+};
+
+exports.getAllAccountingHeadSub = async (req, res) => {
+  try {
+    // Fetch all Accounting Heads
+    
+    const accountingHeads = await AccountingHead.find({type: req.body.type, parent: req.body.parent})
       .populate("parent") // For hierarchical structure
       .populate("assets") // Include linked assets
       .populate("stocks"); // Include linked stocks
@@ -242,14 +270,31 @@ exports.createVoucher = async (req, res) => {
     const pad = (num) => String(num).padStart(2, '0');
     const voucherNo = `CP${datee.getFullYear().toString().slice(-2)}${pad(datee.getMonth() + 1)}${pad(datee.getDate())}${datee.getMilliseconds()}`;
 
-    const voucherId = `V-${Date.now()}`;
+    const voucherId = `V-${Date.now()}`;    
+    let accountHead = req.body.transactions[0].accountHead
+
+    console.log(req.body);
+    
+    if(req.body.transactions[0].subMajorHead !== '' && req.body.transactions[0].subMajorHead !== null){
+      accountHead = req.body.transactions[0].subMajorHead
+    }
+    
+    const transactions = [
+      { accountHead: accountHead , type: 'Debit', amount: parseFloat(req.body.transactions[0].debit)},
+      { accountHead: accountHead , type: 'Credit', amount: parseFloat(req.body.transactions[0].credit)}
+    ]
+
+    req.body.subMajorHead = null
+
     const voucher = new Voucher({ ...req.body, voucherId, voucherNo });
+
+    voucher.transactions = transactions;
 
     // Validate transactions
     if (!Array.isArray(voucher.transactions)) {
       return res.status(400).json({ error: 'Transactions must be an array' });
     }
-
+    
     // Calculate debit and credit totals
     const debitTotal = voucher.transactions
       .filter((t) => t.type === 'Debit')
@@ -322,7 +367,7 @@ exports.deleteVoucher = async (req, res) => {
 // Get all vouchers
 exports.getAllVouchers = async (req, res) => {
   try {
-    const vouchers = await Voucher.find({}).populate('payee').populate('transactions.accountHead');
+    const vouchers = await Voucher.find({}).populate('payee').populate('transactions.accountHead').populate('approvingAuthority');
     res.status(200).json({ success: true, data: vouchers });
   } catch (error) {
     res.status(500).json({ success: false, data: 'Failed to fetch vouchers', error });
