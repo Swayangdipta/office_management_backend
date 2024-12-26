@@ -7,14 +7,17 @@ const TransactionSchema = new mongoose.Schema(
       ref: 'AccountingHead',
       required: true,
     },
-    type: {
-      type: String,
-      enum: ['Debit', 'Credit'],
-      required: true,
+    subMajorHead: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'AccountingHead',
     },
-    amount: {
+    debit: {
       type: Number,
-      required: true,
+      // required: true,
+    },
+    credit: {
+      type: Number,
+      // required: true,
     },
   },
   { _id: false }

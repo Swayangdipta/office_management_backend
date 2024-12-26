@@ -265,30 +265,23 @@ exports.getAllParties = async (req, res) => {
 exports.createVoucher = async (req, res) => {
   try {
     const datee = new Date();
-
+    console.log(req.body);
+    
     // Shortened Voucher No
     const pad = (num) => String(num).padStart(2, '0');
     const voucherNo = `CP${datee.getFullYear().toString().slice(-2)}${pad(datee.getMonth() + 1)}${pad(datee.getDate())}${datee.getMilliseconds()}`;
 
-    const voucherId = `V-${Date.now()}`;    
-    let accountHead = req.body.transactions[0].accountHead
+    const voucherId = `V-${Date.now()}`;
 
-    console.log(req.body);
-    
-    if(req.body.transactions[0].subMajorHead !== '' && req.body.transactions[0].subMajorHead !== null){
-      accountHead = req.body.transactions[0].subMajorHead
-    }
-    
-    const transactions = [
-      { accountHead: accountHead , type: 'Debit', amount: parseFloat(req.body.transactions[0].debit)},
-      { accountHead: accountHead , type: 'Credit', amount: parseFloat(req.body.transactions[0].credit)}
-    ]
-
-    req.body.subMajorHead = null
+    // Check and set subMajorHead to null if not provided or empty in each transaction
+    req.body.transactions = req.body.transactions.map(transaction => {
+      if (!transaction.subMajorHead || transaction.subMajorHead === '') {
+        transaction.subMajorHead = null;
+      }
+      return transaction;
+    });
 
     const voucher = new Voucher({ ...req.body, voucherId, voucherNo });
-
-    voucher.transactions = transactions;
 
     // Validate transactions
     if (!Array.isArray(voucher.transactions)) {
@@ -297,12 +290,12 @@ exports.createVoucher = async (req, res) => {
     
     // Calculate debit and credit totals
     const debitTotal = voucher.transactions
-      .filter((t) => t.type === 'Debit')
-      .reduce((sum, t) => sum + t.amount, 0);
+      .filter((t) => t.debit > 0)
+      .reduce((sum, t) => sum + t.debit, 0);
 
     const creditTotal = voucher.transactions
-      .filter((t) => t.type === 'Credit')
-      .reduce((sum, t) => sum + t.amount, 0);
+      .filter((t) => t.credit > 0)
+      .reduce((sum, t) => sum + t.credit, 0);
 
     voucher.isBalanced = debitTotal === creditTotal;
 
@@ -367,7 +360,7 @@ exports.deleteVoucher = async (req, res) => {
 // Get all vouchers
 exports.getAllVouchers = async (req, res) => {
   try {
-    const vouchers = await Voucher.find({}).populate('payee').populate('transactions.accountHead').populate('approvingAuthority');
+    const vouchers = await Voucher.find({}).populate('payee').populate('transactions.accountHead').populate('transactions.subMajorHead').populate('approvingAuthority');
     res.status(200).json({ success: true, data: vouchers });
   } catch (error) {
     res.status(500).json({ success: false, data: 'Failed to fetch vouchers', error });
@@ -546,7 +539,7 @@ exports.closeYear = async (req, res) => {
 exports.trialBalance = async (req, res) => {
   try {
     const { startDate, endDate } = req.body;
-
+    
     const parsedStartDate = new Date(startDate);
     const parsedEndDate = new Date(endDate);
 
@@ -554,52 +547,70 @@ exports.trialBalance = async (req, res) => {
       throw new Error('Invalid date format.');
     }
 
-    // Convert to ISO strings
-    const formattedStartDate = parsedStartDate.toISOString();
-    const formattedEndDate = parsedEndDate.toISOString();
-
     const filter = {
-      date: { $gte: new Date(formattedStartDate), $lte: new Date(formattedEndDate) },
+      date: { $gte: parsedStartDate, $lte: parsedEndDate },
     };
 
     const vouchers = await Voucher.find({
-      entryDate: { $gte: new Date(startDate), $lte: new Date(endDate) },
-    });
+      entryDate: filter.date,
+    }).populate('transactions.accountHead');
 
-    const bankTransactions = await BankTransaction.find(filter);
-    
-    let debitTotal = 0;
-    let creditTotal = 0;
+    const bankTransactions = await BankTransaction.find(filter).populate('voucher').populate('voucher.transactions.accountHead');
 
+    // Map account balances
+    const accountBalances = {};
+
+    // Process voucher transactions
     vouchers.forEach((voucher) => {
       voucher.transactions.forEach((tx) => {
-        if (tx.type === 'Debit') {
-          debitTotal += tx.amount;
-        } else if (tx.type === 'Credit') {
-          creditTotal += tx.amount;
+        const { accountHead, debit, credit } = tx;
+        if (!accountBalances[accountHead?.name]) {
+          accountBalances[accountHead?.name] = { debit: 0, credit: 0 };
+        }
+        if (debit > 0 || tx.type === 'Debit') {
+          accountBalances[accountHead.name].debit += debit || tx.amount || 0;
+        } else if (credit > 0 || tx.type === 'Credit') {
+          accountBalances[accountHead.name].credit += credit || tx.amount || 0; 
         }
       });
     });
 
+
+    // Process bank transactions
     bankTransactions.forEach((transaction) => {
-        debitTotal += transaction.debit;
-        creditTotal += transaction.credit;
+      const { voucher, debit, credit } = transaction;
+      if (!accountBalances[voucher.accountHead?.name]) {
+        accountBalances[voucher.accountHead?.name] = { debit: 0, credit: 0 };
+      }
+      accountBalances[voucher.accountHead?.name].debit += debit;
+      accountBalances[voucher.accountHead?.name].credit += credit;
     });
 
+
+    // Prepare trial balance array
+    const trialBalance = Object.entries(accountBalances).map(([accountName, balances]) => ({
+      accountName,
+      debit: balances.debit,
+      credit: balances.credit,
+    }));
+    // Calculate totals
+    const totalDebit = trialBalance.reduce((sum, acc) => sum + acc.debit, 0);
+    const totalCredit = trialBalance.reduce((sum, acc) => sum + acc.credit, 0);
+    
     res.status(200).json({
       success: true,
       data: {
-        debitTotal,
-        creditTotal,
-        isBalanced: debitTotal === creditTotal,
+        trialBalance,
+        totals: { totalDebit, totalCredit },
+        isBalanced: totalDebit === totalCredit,
       },
     });
   } catch (error) {
-    console.log(error);
-    
+    console.error(error);
     res.status(500).json({ success: false, message: 'Error generating Trial Balance', error });
   }
 };
+
 
 exports.profitAndLoss = async (req, res) => {
   try {
