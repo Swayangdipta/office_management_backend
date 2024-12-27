@@ -4,6 +4,10 @@ const Voucher = require('../models/voucher');
 const BankTransaction = require('../models/bankTransaction');
 const AssetDetails = require("../models/assetDetails");
 const StockDetails = require("../models/stockDetails");
+const MonthStatus = require('../models/monthStatus');
+const YearStatus = require('../models/yearStatus');
+const AuditLog = require('../models/auditLog');
+const Depreciation = require('../models/depreciation');
 const _ = require('lodash');
 
 
@@ -470,6 +474,8 @@ exports.getLastFourTransactions = async (req, res) => {
 // Process
 
 // Month-End Processing
+
+// Close Month
 exports.closeMonth = async (req, res) => {
   try {
     // Check for pending reconciliation
@@ -490,14 +496,34 @@ exports.closeMonth = async (req, res) => {
       });
     }
 
-    // Mark month as closed (if necessary, update other systems or logs)
-    res.status(200).json({ success: true, data: 'Month closed successfully.' });
+    // Mark the month as closed
+    const currentDate = new Date();
+    await MonthStatus.updateOne(
+      { year: currentDate.getFullYear(), month: currentDate.getMonth() + 1 },
+      { $set: { closed: true } }
+    );
+
+    // Create an audit log for closing the month
+    const auditLog = new AuditLog({
+      action: 'Close Month',
+      details: 'Month closed successfully.',
+    });
+    await auditLog.save();
+
+    res.status(200).json({
+      success: true,
+      data: 'Month closed successfully.',
+    });
   } catch (error) {
-    res.status(500).json({ success: false, data: 'Failed to close month.', error });
+    res.status(500).json({
+      success: false,
+      data: 'Failed to close month.',
+      error: error.message,
+    });
   }
 };
 
-// Year-End Processing
+// Close Year
 exports.closeYear = async (req, res) => {
   try {
     // Check for pending reconciliation
@@ -518,7 +544,7 @@ exports.closeYear = async (req, res) => {
       });
     }
 
-    // Check for completed year-end transactions
+    // Check for completed year-end transactions (e.g., Depreciation)
     const depreciationTransactions = await Voucher.find({ voucherType: 'Depreciation' });
     if (depreciationTransactions.length === 0) {
       return res.status(400).json({
@@ -527,12 +553,33 @@ exports.closeYear = async (req, res) => {
       });
     }
 
-    // Mark year as closed (if necessary, update other systems or logs)
-    res.status(200).json({ success: true, data: 'Year closed successfully.' });
+    // Mark the year as closed
+    const currentDate = new Date();
+    await YearStatus.updateOne(
+      { year: currentDate.getFullYear() },
+      { $set: { closed: true } }
+    );
+
+    // Create an audit log for closing the year
+    const auditLog = new AuditLog({
+      action: 'Close Year',
+      details: 'Year closed successfully.',
+    });
+    await auditLog.save();
+
+    res.status(200).json({
+      success: true,
+      data: 'Year closed successfully.',
+    });
   } catch (error) {
-    res.status(500).json({ success: false, data: 'Failed to close year.', error });
+    res.status(500).json({
+      success: false,
+      data: 'Failed to close year.',
+      error: error.message,
+    });
   }
 };
+
 
 // Trial Balance
 // Trial Balance
@@ -627,32 +674,93 @@ exports.profitAndLoss = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Invalid date format.' });
     }
 
+    // Check if the specified period is open
+    // const monthStatus = await MonthStatus.findOne({
+    //   year: start.getFullYear(),
+    //   month: start.getMonth() + 1,
+    // });
+    // const yearStatus = await YearStatus.findOne({ year: start.getFullYear() });
+
+    // if (monthStatus?.closed || yearStatus?.closed) {
+    //   return res.status(400).json({
+    //     success: false,
+    //     message: 'The specified period is closed. Unable to generate Profit and Loss statement.',
+    //   });
+    // }
+
     // Fetch vouchers within the date range
     const vouchers = await Voucher.find({
       entryDate: { $gte: start, $lte: end },
     });
 
-    let revenue = 0;
-    let expenses = 0;
+    let revenues = {}; // Dynamic object for all revenue entries
+    let expenses = {}; // Dynamic object for all expense entries
 
     vouchers.forEach((voucher) => {
       voucher.transactions.forEach((transaction) => {
-        if (transaction.type === 'Credit' && voucher.narration.toLowerCase().includes('Revenue'.toLowerCase())) {
-          revenue += transaction.amount;
-        } else if (transaction.type === 'Debit' && voucher.narration.toLowerCase().includes('Expense'.toLowerCase())) {
-          expenses += transaction.amount;
+        const narration = voucher.narration.trim().toLowerCase(); // Normalize narration for consistency
+
+        if (transaction.credit && transaction.credit > 0) {
+          // Dynamically group revenues
+          const key = narration || 'Revenue'; // Default key if narration is empty
+          revenues[key] = (revenues[key] || 0) + transaction.credit;
+        } else if (transaction.debit && transaction.debit > 0) {
+          // Dynamically group expenses
+          const key = narration || 'Expense'; // Default key if narration is empty
+          expenses[key] = (expenses[key] || 0) + transaction.debit;
         }
       });
     });
 
-    const profitOrLoss = revenue - expenses;
+    // Calculate totals for revenue and expenses
+    const totalRevenue = Object.values(revenues).reduce((sum, val) => sum + val, 0);
+    const totalExpenses = Object.values(expenses).reduce((sum, val) => sum + val, 0);
 
+    // Fetch all assets for depreciation
+    const assets = await AssetDetails.find();
+    const depreciationEntries = await Depreciation.find();
+    console.log(depreciationEntries);
+    let totalDepreciation = 0;
+    depreciationEntries.forEach((entry) => {
+      assets.forEach((asset) => {
+        if (asset.assetType.toString() === entry.category.toString()) {
+          totalDepreciation += (asset.purchaseValue * entry.depreciationRate) / 100;
+        }
+      });
+    });
+
+    // Fetch stock details
+    const openingStock = await StockDetails.find({
+      purchaseDate: { $lt: start }, // Stock purchased before the start date
+    });
+
+    const closingStock = await StockDetails.find({
+      purchaseDate: { $lte: end }, // Stock purchased until the end date
+    });
+
+    // Calculate stock values
+    const totalOpeningStockValue = openingStock.reduce((sum, stock) => sum + stock.purchaseValue, 0);
+    const totalClosingStockValue = closingStock.reduce((sum, stock) => sum + stock.purchaseValue, 0);
+
+    // Calculate Gross Profit/Loss
+    const grossProfitOrLoss = totalRevenue - totalExpenses - totalOpeningStockValue + totalClosingStockValue;
+
+    // Final Net Profit/Loss
+    const netProfitOrLoss = grossProfitOrLoss - totalDepreciation;
+
+    // Send response with dynamic breakdown
     res.status(200).json({
       success: true,
       data: {
-        revenue,
+        revenues,
         expenses,
-        profitOrLoss,
+        totalRevenue,
+        totalExpenses,
+        openingStock: totalOpeningStockValue,
+        closingStock: totalClosingStockValue,
+        depreciation: totalDepreciation,
+        grossProfitOrLoss,
+        netProfitOrLoss,
       },
     });
   } catch (error) {
@@ -660,6 +768,7 @@ exports.profitAndLoss = async (req, res) => {
     res.status(500).json({ success: false, message: 'Error generating Profit and Loss account', error });
   }
 };
+
 
 // Balance Sheet
 exports.balanceSheet = async (req, res) => {
@@ -701,7 +810,7 @@ exports.balanceSheet = async (req, res) => {
         }
         balanceSheet.liabilities[description] += credit;
       }
-      
+
       if (debit > 0) {
         // Asset category (debit transactions)
         if (!balanceSheet.assets[description]) {
