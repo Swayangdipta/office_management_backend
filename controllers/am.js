@@ -611,7 +611,6 @@ exports.trialBalance = async (req, res) => {
   }
 };
 
-
 exports.profitAndLoss = async (req, res) => {
   try {
     const { startDate, endDate } = req.body;
@@ -684,23 +683,44 @@ exports.balanceSheet = async (req, res) => {
       date: { $gte: start, $lte: end },
     });
 
-    let totalAssets = 0;
-    let totalLiabilities = 0;
+    // Dynamic structure for the balance sheet
+    const balanceSheet = {
+      liabilities: {},
+      assets: {},
+      totals: { totalLiabilities: 0, totalAssets: 0 },
+    };
 
+    // Categorize transactions dynamically
     transactions.forEach((transaction) => {
-      totalAssets += transaction.debit || 0;
-      totalLiabilities += transaction.credit || 0;
+      const { debit, credit, description } = transaction;
+
+      if (credit > 0) {
+        // Liability category (credit transactions)
+        if (!balanceSheet.liabilities[description]) {
+          balanceSheet.liabilities[description] = 0;
+        }
+        balanceSheet.liabilities[description] += credit;
+      }
+      
+      if (debit > 0) {
+        // Asset category (debit transactions)
+        if (!balanceSheet.assets[description]) {
+          balanceSheet.assets[description] = 0;
+        }
+        balanceSheet.assets[description] += debit;
+      }
     });
 
-    const equity = totalAssets - totalLiabilities;
+    // Calculate totals dynamically
+    const totalLiabilities = Object.values(balanceSheet.liabilities).reduce((sum, value) => sum + value, 0);
+    const totalAssets = Object.values(balanceSheet.assets).reduce((sum, value) => sum + value, 0);
+
+    balanceSheet.totals.totalLiabilities = totalLiabilities;
+    balanceSheet.totals.totalAssets = totalAssets;
 
     res.status(200).json({
       success: true,
-      data: {
-        totalAssets,
-        totalLiabilities,
-        equity,
-      },
+      data: balanceSheet,
     });
   } catch (error) {
     console.error('Error generating Balance Sheet:', error);
